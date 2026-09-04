@@ -48,9 +48,11 @@ final class AppStateTests: XCTestCase {
     }
 
     func testTabSwitching() {
+        XCTAssertEqual(appState.selectedTab, .overview)
+        appState.selectedTab = .clipboard
         XCTAssertEqual(appState.selectedTab, .clipboard)
-        appState.selectedTab = .music
-        XCTAssertEqual(appState.selectedTab, .music)
+        appState.selectedTab = .calendar
+        XCTAssertEqual(appState.selectedTab, .calendar)
         appState.selectedTab = .weather
         XCTAssertEqual(appState.selectedTab, .weather)
         appState.selectedTab = .overview

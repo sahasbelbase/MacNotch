@@ -22,7 +22,6 @@ public enum NotchState: String, CaseIterable, Sendable {
 /// Active tab in the expanded notch utility.
 public enum NotchTab: String, CaseIterable, Identifiable, Sendable {
     case overview = "Overview"
-    case music = "Music"
     case clipboard = "Clipboard"
     case calendar = "Calendar"
     case weather = "Weather"
@@ -32,7 +31,6 @@ public enum NotchTab: String, CaseIterable, Identifiable, Sendable {
     public var icon: String {
         switch self {
         case .overview: return "square.grid.2x2"
-        case .music: return "music.note"
         case .clipboard: return "doc.on.clipboard"
         case .calendar: return "calendar"
         case .weather: return "cloud.sun"
@@ -44,7 +42,7 @@ public enum NotchTab: String, CaseIterable, Identifiable, Sendable {
 @MainActor
 public final class AppState: ObservableObject {
     @Published public private(set) var currentState: NotchState = .collapsed
-    @Published public var selectedTab: NotchTab = .clipboard
+    @Published public var selectedTab: NotchTab = .overview
     @Published public var isEnabled: Bool = true {
         didSet {
             if !isEnabled {

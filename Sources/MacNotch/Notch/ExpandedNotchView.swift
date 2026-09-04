@@ -37,8 +37,6 @@ public struct ExpandedNotchView: View {
                 switch appState.selectedTab {
                 case .overview:
                     overviewHierarchyView
-                case .music:
-                    MusicView(nowPlayingService: nowPlayingService, isCompact: false, isFullTab: true)
                 case .clipboard:
                     ClipboardView(clipboardManager: clipboardManager)
                 case .calendar:
@@ -64,7 +62,7 @@ public struct ExpandedNotchView: View {
     // MARK: - Header Bar
     private var topHeaderBar: some View {
         HStack {
-            // Tab Selection Pills
+            // Tab Selection Pills (Overview, Clipboard, Calendar, Weather)
             HStack(spacing: 4) {
                 ForEach(NotchTab.allCases) { tab in
                     Button(action: {
@@ -92,29 +90,19 @@ public struct ExpandedNotchView: View {
 
             Spacer(minLength: 12)
 
-            // Status Pill (Time) & In-Notch Settings Button
-            HStack(spacing: 8) {
-                TimeView(timeService: timeService, isCompact: true)
-
-                Button(action: {
-                    SettingsWindowController.shared.showSettings(clipboardManager: clipboardManager)
-                }) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignSystem.Colors.textSecondary)
-                        .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.08))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .help("Open MacNotch Settings")
+            // In-Notch Settings Button
+            Button(action: {
+                SettingsWindowController.shared.showSettings(clipboardManager: clipboardManager)
+            }) {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 11))
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
+                    .frame(width: 24, height: 24)
+                    .background(Color.white.opacity(0.08))
+                    .clipShape(Circle())
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(
-                Capsule()
-                    .fill(Color.black.opacity(0.35))
-            )
+            .buttonStyle(.plain)
+            .help("Open MacNotch Settings")
         }
         .padding(.horizontal, 6)
         .padding(.top, 2)
