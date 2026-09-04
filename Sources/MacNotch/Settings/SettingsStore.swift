@@ -26,8 +26,9 @@ public final class SettingsStore: ObservableObject {
     @AppStorage("selectedLocationId") public var selectedLocationId: String = "ktm"
     @AppStorage("tempUnit") public var tempUnit: String = TemperatureUnit.celsius.rawValue
 
-    // MARK: - Appearance Settings
+    // MARK: - Appearance & Diagnostic Settings
     @AppStorage("appAppearance") public var appAppearance: String = "System"
+    @AppStorage("showGeometryOverlay") public var showGeometryOverlay: Bool = false
 
     public init() {
         // Sync launch at login status with SMAppService if available

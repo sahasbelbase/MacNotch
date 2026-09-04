@@ -6,6 +6,7 @@ import Foundation
 @MainActor
 public final class ScreenManager: ObservableObject {
     @Published public private(set) var activeScreen: NSScreen?
+    @Published public private(set) var currentCapabilities: DisplayCapabilities?
     @Published public private(set) var currentNotchGeometry: NotchGeometry?
     @Published public private(set) var hasNotch: Bool = false
     
@@ -29,11 +30,14 @@ public final class ScreenManager: ObservableObject {
     public func recalculateDisplayGeometry() {
         if let result = notchDetector.findNotchScreen() {
             self.activeScreen = result.screen
+            self.currentCapabilities = notchDetector.capabilities(for: result.screen)
             self.currentNotchGeometry = result.geometry
             self.hasNotch = true
         } else {
             // Fall back to main screen or nil (no visual notch on non-notch screen)
-            self.activeScreen = NSScreen.main
+            let main = NSScreen.main
+            self.activeScreen = main
+            self.currentCapabilities = main.map { notchDetector.capabilities(for: $0) }
             self.currentNotchGeometry = nil
             self.hasNotch = false
         }

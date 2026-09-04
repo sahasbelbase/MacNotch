@@ -4,15 +4,15 @@ import SwiftUI
 public enum DesignSystem {
     // MARK: - Dimensions
     public enum Dimensions {
-        public static let collapsedHeight: CGFloat = 38
-        public static let expandedWidth: CGFloat = 580
-        public static let expandedHeight: CGFloat = 240
-        public static let cornerRadius: CGFloat = 18
+        public static let collapsedHeight: CGFloat = 10
+        public static let expandedWidth: CGFloat = 720
+        public static let expandedHeight: CGFloat = 290
+        public static let cornerRadius: CGFloat = 20
         public static let notchCornerRadius: CGFloat = 10
-        public static let cardWidth: CGFloat = 160
-        public static let cardHeight: CGFloat = 110
+        public static let cardWidth: CGFloat = 200
+        public static let cardHeight: CGFloat = 120
         public static let cardCornerRadius: CGFloat = 12
-        public static let activationExtraHeight: CGFloat = 8
+        public static let activationExtraHeight: CGFloat = 12
     }
 
     // MARK: - Animations

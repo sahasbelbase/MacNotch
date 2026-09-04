@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Minimal collapsed state that visually integrates with the physical camera housing.
+/// Minimal collapsed state that visually integrates with the physical camera housing
+/// as a sleek hardware chin extending below the notch.
 public struct CollapsedNotchView: View {
     @ObservedObject var appState: AppState
 
@@ -10,20 +11,19 @@ public struct CollapsedNotchView: View {
 
     public var body: some View {
         ZStack {
-            // Background matching physical camera notch
-            NotchShape(cornerRadius: DesignSystem.Dimensions.notchCornerRadius)
+            // Hardware-matched chin with continuous bottom rounded corners
+            NotchShape(cornerRadius: 6)
                 .fill(Color.black)
                 .overlay(
-                    NotchShape(cornerRadius: DesignSystem.Dimensions.notchCornerRadius)
+                    NotchShape(cornerRadius: 6)
                         .stroke(DesignSystem.Colors.subtleBorder.opacity(0.4), lineWidth: 0.5)
                 )
 
-            // Subtle indicator when activating
+            // Subtle indicator when mouse enters activation zone
             if appState.currentState == .activating {
                 Capsule()
-                    .fill(Color.accentColor.opacity(0.8))
-                    .frame(width: 24, height: 3)
-                    .offset(y: 12)
+                    .fill(Color.accentColor.opacity(0.9))
+                    .frame(width: 28, height: 2.5)
                     .transition(.opacity.combined(with: .scale))
             }
         }

@@ -57,9 +57,9 @@ public final class WindowManager: ObservableObject {
         let targetFrame: NSRect
         switch appState.currentState {
         case .expanded:
-            targetFrame = geometry.expandedFrame()
+            targetFrame = geometry.expandedRect
         case .collapsed, .activating, .collapsing:
-            targetFrame = geometry.collapsedFrame()
+            targetFrame = geometry.collapsedRect
         case .hidden:
             panel.orderOut(nil)
             return

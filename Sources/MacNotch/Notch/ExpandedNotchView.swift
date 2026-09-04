@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Main expanded utility interface integrating Time, Weather, Music, and Clipboard history.
+/// Main expanded utility interface integrating Time, Weather, Music, and Clipboard history
+/// with a responsive, vertically spacious hierarchy and zero icon collision.
 public struct ExpandedNotchView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var clipboardManager: ClipboardManager
@@ -24,53 +25,8 @@ public struct ExpandedNotchView: View {
 
     public var body: some View {
         VStack(spacing: 8) {
-            // Top Bar: Navigation Tabs & Status
-            HStack {
-                // Tab Selection Pills
-                HStack(spacing: 4) {
-                    ForEach(NotchTab.allCases) { tab in
-                        Button(action: {
-                            withAnimation(DesignSystem.Animation.tabSwitch) {
-                                appState.selectedTab = tab
-                            }
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: 10, weight: .semibold))
-                                Text(tab.rawValue)
-                                    .font(.system(size: 11, weight: .medium))
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule()
-                                    .fill(appState.selectedTab == tab ? Color.white.opacity(0.18) : Color.clear)
-                            )
-                            .foregroundColor(appState.selectedTab == tab ? .white : DesignSystem.Colors.textSecondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
-                Spacer()
-
-                // Compact Right Status Pills (Time & Weather)
-                HStack(spacing: 8) {
-                    TimeView(timeService: timeService, isCompact: true)
-                    Text("•")
-                        .foregroundColor(DesignSystem.Colors.textTertiary)
-                        .font(.system(size: 8))
-                    WeatherView(weatherService: weatherService, isCompact: true)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(
-                    Capsule()
-                        .fill(Color.black.opacity(0.3))
-                )
-            }
-            .padding(.horizontal, 8)
-            .padding(.top, 4)
+            // Row 1: Top Navigation Tabs & Status Pills
+            topHeaderBar
 
             Divider()
                 .background(DesignSystem.Colors.subtleBorder)
@@ -80,11 +36,11 @@ public struct ExpandedNotchView: View {
             Group {
                 switch appState.selectedTab {
                 case .overview:
-                    overviewView
+                    overviewHierarchyView
                 case .clipboard:
                     ClipboardView(clipboardManager: clipboardManager)
                 case .music:
-                    MusicView(nowPlayingService: nowPlayingService, isCompact: false)
+                    MusicView(nowPlayingService: nowPlayingService, isCompact: false, isFullTab: true)
                 case .weather:
                     WeatherView(weatherService: weatherService, isCompact: false)
                 }
@@ -99,27 +55,69 @@ public struct ExpandedNotchView: View {
                     RoundedRectangle(cornerRadius: DesignSystem.Dimensions.cornerRadius, style: .continuous)
                         .stroke(DesignSystem.Colors.subtleBorder, lineWidth: 1)
                 )
-                .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)
+                .shadow(color: .black.opacity(0.4), radius: 24, x: 0, y: 12)
         )
     }
 
-    private var overviewView: some View {
-        VStack(spacing: 8) {
-            // Quick Status Tiles
-            HStack(spacing: 8) {
-                TimeView(timeService: timeService, isCompact: false)
-                    .frame(maxWidth: .infinity)
-
-                WeatherView(weatherService: weatherService, isCompact: false)
-                    .frame(maxWidth: .infinity)
-
-                MusicView(nowPlayingService: nowPlayingService, isCompact: false)
-                    .frame(maxWidth: .infinity)
+    // MARK: - Header Bar
+    private var topHeaderBar: some View {
+        HStack {
+            // Tab Selection Pills
+            HStack(spacing: 4) {
+                ForEach(NotchTab.allCases) { tab in
+                    Button(action: {
+                        withAnimation(DesignSystem.Animation.tabSwitch) {
+                            appState.selectedTab = tab
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 10, weight: .semibold))
+                            Text(tab.rawValue)
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(appState.selectedTab == tab ? Color.white.opacity(0.18) : Color.clear)
+                        )
+                        .foregroundColor(appState.selectedTab == tab ? .white : DesignSystem.Colors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .frame(height: 72)
 
-            // Clipboard Carousel Preview
+            Spacer(minLength: 12)
+
+            // Status Pills (Time & Weather)
+            HStack(spacing: 8) {
+                TimeView(timeService: timeService, isCompact: true)
+                Text("•")
+                    .foregroundColor(DesignSystem.Colors.textTertiary)
+                    .font(.system(size: 8))
+                WeatherView(weatherService: weatherService, isCompact: true)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.35))
+            )
+        }
+        .padding(.horizontal, 6)
+        .padding(.top, 2)
+    }
+
+    // MARK: - Overview Hierarchy View (Zero-overlap vertical arrangement)
+    private var overviewHierarchyView: some View {
+        VStack(spacing: 8) {
+            // Row 2: Full-width Music bar with dedicated controls
+            MusicView(nowPlayingService: nowPlayingService, isCompact: false, isFullTab: false)
+
+            // Row 3: Full-width Clipboard Carousel
             ClipboardView(clipboardManager: clipboardManager)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

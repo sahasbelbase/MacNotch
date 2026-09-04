@@ -75,8 +75,8 @@ public final class MouseTracker: ObservableObject {
             return
         }
 
-        let isInsideActivation = geometry.activationRect(extraBottomPadding: 16).contains(screenLocation)
-        let expandedRect = geometry.expandedFrame()
+        let isInsideActivation = geometry.activationRect.contains(screenLocation)
+        let expandedRect = geometry.expandedRect
         // Provide 10pt safety margin around the expanded frame so cursor can navigate easily
         let isInsideExpanded = expandedRect.insetBy(dx: -10, dy: -10).contains(screenLocation)
 

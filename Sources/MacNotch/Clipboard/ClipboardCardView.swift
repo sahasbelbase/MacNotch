@@ -85,14 +85,14 @@ public struct ClipboardCardView: View {
                         Image(nsImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(maxWidth: .infinity, maxHeight: 52)
+                            .frame(maxWidth: .infinity, maxHeight: 62)
                             .clipped()
                             .cornerRadius(6)
                     } else if item.type == .code {
                         Text(item.preview)
                             .font(.system(size: 10, weight: .regular, design: .monospaced))
                             .foregroundColor(DesignSystem.Colors.textPrimary)
-                            .lineLimit(3)
+                            .lineLimit(4)
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                     } else if item.type == .url, let host = item.domainHost {
                         VStack(alignment: .leading, spacing: 2) {
@@ -108,7 +108,7 @@ public struct ClipboardCardView: View {
                             Text(item.preview)
                                 .font(.system(size: 9))
                                 .foregroundColor(DesignSystem.Colors.textSecondary)
-                                .lineLimit(2)
+                                .lineLimit(3)
                         }
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                     } else if item.type == .file {
@@ -120,7 +120,7 @@ public struct ClipboardCardView: View {
                                     .font(.system(size: 10, weight: .semibold))
                             }
                             .foregroundColor(DesignSystem.Colors.textPrimary)
-                            .lineLimit(1)
+                            .lineLimit(2)
 
                             if let size = item.formattedFileSize {
                                 Text(size)
@@ -133,7 +133,7 @@ public struct ClipboardCardView: View {
                         Text(item.preview)
                             .font(.system(size: 10))
                             .foregroundColor(DesignSystem.Colors.textPrimary)
-                            .lineLimit(3)
+                            .lineLimit(4)
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
 
@@ -153,7 +153,7 @@ public struct ClipboardCardView: View {
                         .transition(.scale.combined(with: .opacity))
                     }
                 }
-                .frame(height: 52)
+                .frame(height: 62)
 
                 // Footer: Secondary Metadata (size / dimensions / chars)
                 HStack {

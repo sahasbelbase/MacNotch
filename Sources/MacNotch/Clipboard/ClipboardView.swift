@@ -189,7 +189,7 @@ public struct ClipboardView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .onChange(of: selectedIndex) { newIndex in
+            .onChange(of: selectedIndex) { _, newIndex in
                 if newIndex < items.count {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         proxy.scrollTo(items[newIndex].id, anchor: .center)

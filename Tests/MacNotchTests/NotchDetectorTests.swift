@@ -20,23 +20,23 @@ final class NotchDetectorTests: XCTestCase {
             auxiliaryTopRight: topRight
         )
 
-        // Collapsed Frame
-        let collapsed = geometry.collapsedFrame(paddingX: 8, extraHeight: 8)
+        // Collapsed Frame sits directly below the camera housing (never covering it)
+        let collapsed = geometry.collapsedFrame()
         XCTAssertEqual(collapsed.width, 221 + 16)
-        XCTAssertEqual(collapsed.height, 38 + 8)
-        XCTAssertEqual(collapsed.maxY, 1169)
+        XCTAssertEqual(collapsed.height, 10)
+        XCTAssertEqual(collapsed.maxY, 1131, "Collapsed panel top must be at camera bottom (1131) so camera is never covered")
+        XCTAssertEqual(collapsed.minY, 1121)
 
-        // Expanded Frame
-        let expanded = geometry.expandedFrame(width: 580, height: 240)
-        XCTAssertEqual(expanded.width, 580)
-        XCTAssertEqual(expanded.height, 240)
-        XCTAssertEqual(expanded.maxY, 1169)
+        // Expanded Frame expands downward from immediately below the camera housing
+        let expanded = geometry.expandedFrame()
+        XCTAssertEqual(expanded.maxY, 1131, "Expanded panel top must be at camera bottom (1131) so camera is never covered")
         XCTAssertEqual(expanded.midX, notchRect.midX)
+        XCTAssertGreaterThan(expanded.width, 600, "Expanded width must be wide and spacious")
 
-        // Activation Rect
-        let activation = geometry.activationRect(extraBottomPadding: 12)
-        XCTAssertEqual(activation.height, 38 + 12)
-        XCTAssertEqual(activation.maxY, 1169)
+        // Activation Rect covers camera housing (1131..1169) plus collapsed chin
+        let activation = geometry.activationRect()
+        XCTAssertEqual(activation.maxY, 1169, "Activation zone extends up to top of screen")
+        XCTAssertLessThan(activation.minY, collapsed.minY, "Activation zone extends down past collapsed chin")
     }
 
     func testNotchDetectionOnCurrentDevice() {
