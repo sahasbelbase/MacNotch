@@ -20,16 +20,16 @@ final class NotchDetectorTests: XCTestCase {
             auxiliaryTopRight: topRight
         )
 
-        // Collapsed Frame sits directly below the camera housing (never covering it)
+        // Collapsed Frame embraces the notch from the top bezel (screenFrame.maxY)
         let collapsed = geometry.collapsedFrame()
-        XCTAssertEqual(collapsed.width, 221 + 16)
-        XCTAssertEqual(collapsed.height, 10)
-        XCTAssertEqual(collapsed.maxY, 1131, "Collapsed panel top must be at camera bottom (1131) so camera is never covered")
-        XCTAssertEqual(collapsed.minY, 1121)
+        XCTAssertEqual(collapsed.width, 221 + 24)
+        XCTAssertEqual(collapsed.height, 42)
+        XCTAssertEqual(collapsed.maxY, 1169, "Collapsed panel embraces the notch from the top bezel (1169)")
+        XCTAssertEqual(collapsed.minY, 1127)
 
-        // Expanded Frame expands downward from immediately below the camera housing
+        // Expanded Frame expands downward from the top bezel embracing the notch
         let expanded = geometry.expandedFrame()
-        XCTAssertEqual(expanded.maxY, 1131, "Expanded panel top must be at camera bottom (1131) so camera is never covered")
+        XCTAssertEqual(expanded.maxY, 1169, "Expanded panel top sits flush at the top bezel (1169) embracing the notch")
         XCTAssertEqual(expanded.midX, notchRect.midX)
         XCTAssertGreaterThan(expanded.width, 600, "Expanded width must be wide and spacious")
 

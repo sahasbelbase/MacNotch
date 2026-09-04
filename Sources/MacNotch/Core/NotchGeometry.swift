@@ -96,13 +96,13 @@ public struct NotchGeometry: Equatable, Sendable {
         let calculatedHeight = screenFrame.height * 0.26
         let responsiveHeight = min(max(calculatedHeight, 280), 330)
 
-        // Collapsed chin height: 10pt subtle tab sitting directly below the camera housing
-        let collapsedHeight: CGFloat = 10
-        let collapsedWidth: CGFloat = cameraRect.width + 16
+        // Collapsed chin height: fits the camera housing + subtle 4pt chin
+        let collapsedHeight = cameraRect.height + 4
+        let collapsedWidth = cameraRect.width + 24
 
-        // ANCHOR POINT: The top of the MacNotch panel sits flush immediately below the camera housing
-        // (i.e. at cameraRect.minY). This GUARANTEES the camera lens/housing is NEVER covered.
-        let anchorTopY = cameraRect.minY
+        // ANCHOR POINT: The top of the MacNotch panel sits flush against the top edge of the screen
+        // (screenFrame.maxY), seamlessly embracing the physical camera notch like a native island.
+        let anchorTopY = screenFrame.maxY
 
         // Collapsed panel rect (screen coords: bottom-left origin)
         let collapsedX = cameraRect.midX - (collapsedWidth / 2)

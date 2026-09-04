@@ -59,53 +59,71 @@ public struct ExpandedNotchView: View {
         )
     }
 
-    // MARK: - Header Bar
+    // MARK: - Header Bar (Left Ear / Notch Cutout / Right Ear Flanking Layout)
     private var topHeaderBar: some View {
-        HStack {
-            // Tab Selection Pills (Overview, Clipboard, Calendar, Weather)
-            HStack(spacing: 4) {
-                ForEach(NotchTab.allCases) { tab in
-                    Button(action: {
-                        withAnimation(DesignSystem.Animation.tabSwitch) {
-                            appState.selectedTab = tab
-                        }
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: tab.icon)
-                                .font(.system(size: 10, weight: .semibold))
-                            Text(tab.rawValue)
-                                .font(.system(size: 11, weight: .medium))
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(appState.selectedTab == tab ? Color.white.opacity(0.18) : Color.clear)
-                        )
-                        .foregroundColor(appState.selectedTab == tab ? .white : DesignSystem.Colors.textSecondary)
-                    }
-                    .buttonStyle(.plain)
-                }
+        HStack(alignment: .center, spacing: 0) {
+            // Left Ear: Overview & Clipboard (flanking left of the physical camera notch)
+            HStack(spacing: 5) {
+                tabButton(for: .overview)
+                tabButton(for: .clipboard)
             }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.trailing, 8)
 
-            Spacer(minLength: 12)
+            // Center: Physical camera notch gap (226pt width, 34pt height)
+            Color.clear
+                .frame(width: 226, height: 34)
 
-            // In-Notch Settings Button
-            Button(action: {
-                SettingsWindowController.shared.showSettings(clipboardManager: clipboardManager)
-            }) {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 11))
-                    .foregroundColor(DesignSystem.Colors.textSecondary)
-                    .frame(width: 24, height: 24)
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(Circle())
+            // Right Ear: Calendar, Weather & Settings (flanking right of the physical camera notch)
+            HStack(spacing: 5) {
+                tabButton(for: .calendar)
+                tabButton(for: .weather)
+                settingsButton
             }
-            .buttonStyle(.plain)
-            .help("Open MacNotch Settings")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 8)
         }
         .padding(.horizontal, 6)
         .padding(.top, 2)
+    }
+
+    @ViewBuilder
+    private func tabButton(for tab: NotchTab) -> some View {
+        Button(action: {
+            withAnimation(DesignSystem.Animation.tabSwitch) {
+                appState.selectedTab = tab
+            }
+        }) {
+            HStack(spacing: 4) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 10, weight: .semibold))
+                Text(tab.rawValue)
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(appState.selectedTab == tab ? Color.white.opacity(0.18) : Color.clear)
+            )
+            .foregroundColor(appState.selectedTab == tab ? .white : DesignSystem.Colors.textSecondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var settingsButton: some View {
+        Button(action: {
+            SettingsWindowController.shared.showSettings(clipboardManager: clipboardManager)
+        }) {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 11))
+                .foregroundColor(DesignSystem.Colors.textSecondary)
+                .frame(width: 24, height: 24)
+                .background(Color.white.opacity(0.08))
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help("Open MacNotch Settings")
     }
 
     @State private var overviewLowerMode: OverviewLowerMode = .musicStudio

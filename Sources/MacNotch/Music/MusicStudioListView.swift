@@ -216,6 +216,14 @@ private struct TrackArtworkThumbnail: View {
     }
 
     private func loadArtwork() {
+        let localFileURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Music/Music Studio")
+            .appendingPathComponent(filename)
+        if let img = MusicStudioNowPlayingProvider.extractArtwork(from: localFileURL) {
+            self.image = img
+            return
+        }
+
         guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
               let url = URL(string: "http://127.0.0.1:5050/api/songs/artwork/\(encoded)") else { return }
 

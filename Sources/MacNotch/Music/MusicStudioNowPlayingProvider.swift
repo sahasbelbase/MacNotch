@@ -179,6 +179,19 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         }
     }
 
+    // MARK: - Artwork Extraction
+
+    /// Synchronously extracts embedded ID3 APIC cover artwork from a local audio file.
+    public static func extractArtwork(from fileURL: URL) -> NSImage? {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
+        let asset = AVURLAsset(url: fileURL)
+        let items = AVMetadataItem.metadataItems(from: asset.metadata, filteredByIdentifier: .commonIdentifierArtwork)
+        if let first = items.first, let data = first.dataValue, let img = NSImage(data: data) {
+            return img
+        }
+        return nil
+    }
+
     // MARK: - Library Management
 
     /// Fetches all songs from http://127.0.0.1:5050/api/songs with local folder fallback.
@@ -197,6 +210,23 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
                         await MainActor.run {
                             self.libraryTracks = songs
                             self.isAvailable = true
+                            if self.currentTrack == nil, let first = songs.first {
+                                self.currentTrack = Track(
+                                    title: first.title,
+                                    artist: first.artist,
+                                    album: first.album,
+                                    duration: first.duration
+                                )
+                                let localFileURL = FileManager.default.homeDirectoryForCurrentUser
+                                    .appendingPathComponent("Music/Music Studio")
+                                    .appendingPathComponent(first.filename)
+                                if let img = Self.extractArtwork(from: localFileURL) {
+                                    self.artwork = img
+                                } else {
+                                    let encoded = first.filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? first.filename
+                                    self.fetchCoverArtwork(coverURL: "/api/songs/artwork/\(encoded)")
+                                }
+                            }
                             self.onUpdate?()
                         }
                         return
@@ -237,6 +267,18 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         self.libraryTracks = scanned.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
         if !self.libraryTracks.isEmpty {
             self.isAvailable = true
+            if self.currentTrack == nil, let first = self.libraryTracks.first {
+                self.currentTrack = Track(
+                    title: first.title,
+                    artist: first.artist,
+                    album: first.album,
+                    duration: first.duration
+                )
+                let localFileURL = musicDir.appendingPathComponent(first.filename)
+                if let img = Self.extractArtwork(from: localFileURL) {
+                    self.artwork = img
+                }
+            }
         }
         self.onUpdate?()
     }
@@ -251,66 +293,171 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         )
         self.isPlaying = true
         self.isAvailable = true
+        self.currentTime = 0
+        self.duration = track.duration ?? 0
 
-        // 1. Dispatch play_track command to local Music Studio server
+        // 1. Extract cover artwork immediately from local file or fetch from server
+        let localFileURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Music/Music Studio")
+            .appendingPathComponent(track.filename)
+        if let img = Self.extractArtwork(from: localFileURL) {
+            self.artwork = img
+        } else {
+            let encoded = track.filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? track.filename
+            fetchCoverArtwork(coverURL: "/api/songs/artwork/\(encoded)")
+        }
+
+        // 2. Dispatch play_track command to local Music Studio server
         sendAction("play_track", additionalFields: [
             "filename": track.filename,
             "title": track.title
         ])
 
-        // 2. Fetch track artwork
-        let encoded = track.filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? track.filename
-        fetchCoverArtwork(coverURL: "/api/songs/artwork/\(encoded)")
+        // 3. Update server playback state so Music Studio dock & mac_nowplaying are in sync
+        updateServerPlaybackState(track: track, isPlaying: true)
 
-        // 3. Native audio fallback for instant audio playback
-        let localFileURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Music/Music Studio")
-            .appendingPathComponent(track.filename)
-        if FileManager.default.fileExists(atPath: localFileURL.path) {
-            let item = AVPlayerItem(url: localFileURL)
-            if self.localPlayer == nil {
-                self.localPlayer = AVPlayer(playerItem: item)
-            } else {
-                self.localPlayer?.replaceCurrentItem(with: item)
-            }
-            self.localPlayer?.play()
-        }
+        // 4. Native audio playback via AVPlayer
+        playLocalAudio(filename: track.filename)
 
         self.onUpdate?()
+    }
+
+    private func playLocalAudio(filename: String) {
+        let localFileURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Music/Music Studio")
+            .appendingPathComponent(filename)
+
+        if FileManager.default.fileExists(atPath: localFileURL.path) {
+            setupAndPlay(item: AVPlayerItem(url: localFileURL))
+        } else if let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+                  let streamURL = URL(string: "\(baseURL)/api/songs/audio/\(encoded)") {
+            setupAndPlay(item: AVPlayerItem(url: streamURL))
+        }
+    }
+
+    private func setupAndPlay(item: AVPlayerItem) {
+        if self.localPlayer == nil {
+            self.localPlayer = AVPlayer(playerItem: item)
+            self.localPlayer?.volume = 1.0
+            let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
+            self.localPlayer?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+                MainActor.assumeIsolated {
+                    guard let self = self, self.isPlaying else { return }
+                    self.currentTime = CMTimeGetSeconds(time)
+                    self.onUpdate?()
+                }
+            }
+        } else {
+            self.localPlayer?.replaceCurrentItem(with: item)
+        }
+
+        // Auto-advance observer when song ends
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
+        NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.next()
+            }
+        }
+
+        self.localPlayer?.play()
+    }
+
+    private func updateServerPlaybackState(track: MusicStudioTrack, isPlaying: Bool) {
+        guard let url = URL(string: "\(baseURL)/api/playback") else { return }
+        let encoded = track.filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? track.filename
+        let payload: [String: Any] = [
+            "is_playing": isPlaying,
+            "title": track.title,
+            "artist": track.artist,
+            "album": track.album,
+            "cover_url": "/api/songs/artwork/\(encoded)",
+            "current_time": currentTime,
+            "duration": track.duration ?? 0,
+            "index": libraryTracks.firstIndex(where: { $0.filename == track.filename }) ?? 0
+        ]
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+
+        Task {
+            _ = try? await session.data(for: request)
+        }
     }
 
     // MARK: - Playback Actions
 
     public func play() {
-        sendAction("play")
-        localPlayer?.play()
-        isPlaying = true
+        if let current = currentTrack {
+            isPlaying = true
+            sendAction("play")
+            if localPlayer?.currentItem != nil {
+                localPlayer?.play()
+            } else if let track = libraryTracks.first(where: { $0.title == current.title }) {
+                playTrack(track)
+                return
+            } else if let first = libraryTracks.first {
+                playTrack(first)
+                return
+            }
+            if let track = libraryTracks.first(where: { $0.title == current.title }) {
+                updateServerPlaybackState(track: track, isPlaying: true)
+            }
+        } else if let first = libraryTracks.first {
+            playTrack(first)
+        }
+        self.onUpdate?()
     }
 
     public func pause() {
-        sendAction("pause")
         localPlayer?.pause()
         isPlaying = false
+        sendAction("pause")
+        if let current = currentTrack, let track = libraryTracks.first(where: { $0.title == current.title }) {
+            updateServerPlaybackState(track: track, isPlaying: false)
+        }
+        self.onUpdate?()
     }
 
     public func togglePlayPause() {
-        sendAction("toggle")
         if isPlaying {
-            localPlayer?.pause()
+            pause()
         } else {
-            localPlayer?.play()
+            play()
         }
-        isPlaying.toggle()
     }
 
     public func next() {
-        sendAction("next")
-        localPlayer?.pause()
+        guard !libraryTracks.isEmpty else {
+            sendAction("next")
+            return
+        }
+        if let current = currentTrack,
+           let currentIndex = libraryTracks.firstIndex(where: { $0.title == current.title }) {
+            let nextIndex = (currentIndex + 1) % libraryTracks.count
+            playTrack(libraryTracks[nextIndex])
+        } else if let first = libraryTracks.first {
+            playTrack(first)
+        }
     }
 
     public func previous() {
-        sendAction("prev")
-        localPlayer?.pause()
+        guard !libraryTracks.isEmpty else {
+            sendAction("prev")
+            return
+        }
+        if let current = currentTrack,
+           let currentIndex = libraryTracks.firstIndex(where: { $0.title == current.title }) {
+            let prevIndex = (currentIndex - 1 + libraryTracks.count) % libraryTracks.count
+            playTrack(libraryTracks[prevIndex])
+        } else if let first = libraryTracks.first {
+            playTrack(first)
+        }
     }
 
     private func sendAction(_ action: String, additionalFields: [String: Any]? = nil) {

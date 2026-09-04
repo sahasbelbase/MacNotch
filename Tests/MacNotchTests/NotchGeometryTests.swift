@@ -27,12 +27,12 @@ final class NotchGeometryTests: XCTestCase {
         XCTAssertTrue(geo.hasNotch)
         XCTAssertEqual(geo.cameraExclusionRect, cameraRect)
 
-        // CRITICAL: Camera Overlap Invariant
-        // The top of the collapsed panel and expanded panel MUST be at cameraRect.minY
-        // so the camera lens and hardware housing are NEVER rendered over!
-        XCTAssertEqual(geo.collapsedRect.maxY, cameraRect.minY, "Collapsed panel top must be at camera bottom")
-        XCTAssertEqual(geo.expandedRect.maxY, cameraRect.minY, "Expanded panel top must be at camera bottom")
-        XCTAssertEqual(geo.collapsedRect.height, 10, "Collapsed chin height")
+        // CRITICAL: Notch Embracing Invariant
+        // The top of the collapsed panel and expanded panel sits flush at screenFrame.maxY
+        // seamlessly embracing the physical camera notch like a native island.
+        XCTAssertEqual(geo.collapsedRect.maxY, frame.maxY, "Collapsed panel embraces the notch from the top bezel")
+        XCTAssertEqual(geo.expandedRect.maxY, frame.maxY, "Expanded panel embraces the notch from the top bezel")
+        XCTAssertEqual(geo.collapsedRect.height, 42, "Collapsed chin height fits camera + 4pt padding")
         XCTAssertEqual(geo.collapsedRect.midX, cameraRect.midX, "Collapsed panel must be centered with camera")
         XCTAssertEqual(geo.expandedRect.midX, cameraRect.midX, "Expanded panel must be centered with camera")
 
@@ -61,7 +61,7 @@ final class NotchGeometryTests: XCTestCase {
         let geo = NotchGeometry.compute(from: caps, screenFrame: frame)!
         // 1728 * 0.42 = 725.76
         XCTAssertEqual(geo.expandedRect.width, 725.76, accuracy: 1.0)
-        XCTAssertEqual(geo.expandedRect.maxY, 1079)
+        XCTAssertEqual(geo.expandedRect.maxY, 1117)
     }
 
     func testNonNotchDisplayReturnsNil() {
