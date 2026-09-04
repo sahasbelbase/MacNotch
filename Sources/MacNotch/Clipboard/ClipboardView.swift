@@ -80,14 +80,17 @@ public struct ClipboardView: View {
         }
         // Keyboard event handling
         .onKeyPress(.leftArrow) {
+            guard !isSearchFocused else { return .ignored }
             handleArrowNavigation(delta: -1)
             return .handled
         }
         .onKeyPress(.rightArrow) {
+            guard !isSearchFocused else { return .ignored }
             handleArrowNavigation(delta: 1)
             return .handled
         }
         .onKeyPress(.return) {
+            guard !isSearchFocused else { return .ignored }
             if inspectedItem == nil && !items.isEmpty && selectedIndex < items.count {
                 clipboardManager.copyToPasteboard(items[selectedIndex])
                 return .handled
@@ -95,6 +98,7 @@ public struct ClipboardView: View {
             return .ignored
         }
         .onKeyPress(.space) {
+            guard !isSearchFocused else { return .ignored }
             if inspectedItem == nil && !items.isEmpty && selectedIndex < items.count {
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
                     inspectedItem = items[selectedIndex]

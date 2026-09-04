@@ -18,16 +18,36 @@ public final class NotchPanel: NSPanel {
         self.backgroundColor = .clear
         self.hasShadow = false
         self.ignoresMouseEvents = false
-        self.becomesKeyOnlyIfNeeded = true
+        self.becomesKeyOnlyIfNeeded = false
         self.isMovableByWindowBackground = false
         self.hidesOnDeactivate = false
     }
 
     override public var canBecomeKey: Bool {
-        false
+        true
     }
 
     override public var canBecomeMain: Bool {
-        false
+        true
+    }
+
+    override public var acceptsFirstResponder: Bool {
+        true
+    }
+
+    override public func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown && !isKeyWindow {
+            makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        super.sendEvent(event)
+    }
+
+    override public func mouseDown(with event: NSEvent) {
+        if !isKeyWindow {
+            makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        super.mouseDown(with: event)
     }
 }

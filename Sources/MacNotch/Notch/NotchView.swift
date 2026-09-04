@@ -3,6 +3,7 @@ import SwiftUI
 /// Root SwiftUI view hosted inside `NotchPanel`.
 public struct NotchView: View {
     @ObservedObject var appState: AppState
+    @ObservedObject var screenManager: ScreenManager
     @ObservedObject var clipboardManager: ClipboardManager
     @ObservedObject var timeService: TimeService
     @ObservedObject var weatherService: WeatherService
@@ -11,12 +12,14 @@ public struct NotchView: View {
 
     public init(
         appState: AppState,
+        screenManager: ScreenManager,
         clipboardManager: ClipboardManager,
         timeService: TimeService,
         weatherService: WeatherService,
         nowPlayingService: SystemNowPlayingService
     ) {
         self.appState = appState
+        self.screenManager = screenManager
         self.clipboardManager = clipboardManager
         self.timeService = timeService
         self.weatherService = weatherService
@@ -28,6 +31,7 @@ public struct NotchView: View {
             if appState.currentState == .expanded {
                 ExpandedNotchView(
                     appState: appState,
+                    screenManager: screenManager,
                     clipboardManager: clipboardManager,
                     timeService: timeService,
                     weatherService: weatherService,

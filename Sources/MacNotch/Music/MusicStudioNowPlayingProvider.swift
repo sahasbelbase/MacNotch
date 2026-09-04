@@ -40,6 +40,9 @@ public struct MusicStudioTrack: Identifiable, Codable, Hashable, Sendable {
 
 /// Native provider that communicates directly with the local "Music Studio" engine (port 5050).
 /// Supports live metadata (title, artist, album, duration, elapsed time), library browsing, and transport actions.
+///
+/// NOTE: MacNotch acts purely as a remote HUD and controller. All audio decoding and playback is handled
+/// exclusively by Music Studio's audio engine to prevent duplicate or conflicting audio streams.
 @MainActor
 public final class MusicStudioNowPlayingProvider: NowPlayingProvider, ObservableObject {
     public let providerName: String = "Music Studio"
@@ -56,38 +59,82 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
 
     private let baseURL = "http://127.0.0.1:5050"
     private var pollTimer: Timer?
+    private var sseTask: Task<Void, Never>?
     private var lastCoverURL: String?
     private let session: URLSession
-    private var localPlayer: AVPlayer?
 
     public init() {
-        let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 1.0
-        config.timeoutIntervalForResource = 1.5
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 2.0
+        config.timeoutIntervalForResource = 3.0
         self.session = URLSession(configuration: config)
 
         fetchLibrary()
         startPolling()
+        startEventListener()
     }
 
     deinit {
         pollTimer?.invalidate()
+        sseTask?.cancel()
     }
+
+    // MARK: - Real-Time Synchronization & Polling
 
     public func startPolling() {
         stopPolling()
-        // Poll immediately, then every 1.5 seconds
         fetchPlaybackState()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+
+        // Schedule timer in .common mode so mouse tracking / notch hover does not freeze updates
+        let timer = Timer(timeInterval: 0.4, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.fetchPlaybackState()
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        self.pollTimer = timer
     }
 
     public func stopPolling() {
         pollTimer?.invalidate()
         pollTimer = nil
+    }
+
+    /// Connects to Music Studio SSE events stream (http://127.0.0.1:5050/api/events)
+    /// for zero-latency real-time playback synchronization.
+    public func startEventListener() {
+        sseTask?.cancel()
+        guard let url = URL(string: "\(baseURL)/api/events") else { return }
+
+        sseTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    let (bytes, response) = try await URLSession.shared.bytes(from: url)
+                    guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                        try await Task.sleep(nanoseconds: 2_000_000_000)
+                        continue
+                    }
+
+                    for try await line in bytes.lines {
+                        if Task.isCancelled { break }
+                        guard line.hasPrefix("data: ") else { continue }
+                        let jsonStr = String(line.dropFirst(6))
+                        guard let data = jsonStr.data(using: .utf8),
+                              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                              let eventType = obj["type"] as? String else { continue }
+
+                        if eventType == "playback", let playbackData = obj["data"] as? [String: Any] {
+                            await MainActor.run { [weak self] in
+                                self?.processPlaybackJSON(playbackData)
+                            }
+                        }
+                    }
+                } catch {
+                    // Retry connection after brief backoff
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                }
+            }
+        }
     }
 
     /// Queries http://127.0.0.1:5050/api/playback asynchronously.
@@ -98,12 +145,6 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
             do {
                 let (data, response) = try await session.data(from: url)
                 guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                    await MainActor.run {
-                        if self.isAvailable {
-                            self.isAvailable = false
-                            self.onUpdate?()
-                        }
-                    }
                     return
                 }
 
@@ -111,12 +152,7 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
                     await self.processPlaybackJSON(json)
                 }
             } catch {
-                await MainActor.run {
-                    if self.isAvailable {
-                        self.isAvailable = false
-                        self.onUpdate?()
-                    }
-                }
+                // Server temporarily unreachable
             }
         }
     }
@@ -133,24 +169,24 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         self.isPlaying = playing
         self.currentTime = curTime
         self.duration = dur
-        self.isAvailable = !title.isEmpty || playing
 
         if !title.isEmpty {
+            self.isAvailable = true
             self.currentTrack = Track(
                 title: title,
-                artist: artist,
+                artist: artist.isEmpty ? "Music Studio" : artist,
                 album: album,
                 duration: dur > 0 ? dur : nil
             )
-        } else {
-            self.currentTrack = nil
+        } else if playing {
+            self.isAvailable = true
         }
 
         // Fetch cover artwork if available and changed
         if !coverURL.isEmpty && coverURL != lastCoverURL {
             self.lastCoverURL = coverURL
             fetchCoverArtwork(coverURL: coverURL)
-        } else if coverURL.isEmpty {
+        } else if coverURL.isEmpty && self.currentTrack == nil {
             self.lastCoverURL = nil
             self.artwork = nil
         }
@@ -159,6 +195,23 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
     }
 
     private func fetchCoverArtwork(coverURL: String) {
+        // Check if artwork can be extracted locally from Music Studio library folder first
+        let musicDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Music/Music Studio")
+        if let current = currentTrack {
+            let possibleFilenames = [
+                "\(current.artist) - \(current.title).mp3",
+                "\(current.title).mp3"
+            ]
+            for name in possibleFilenames {
+                let fileURL = musicDir.appendingPathComponent(name)
+                if let img = Self.extractArtwork(from: fileURL) {
+                    self.artwork = img
+                    self.onUpdate?()
+                    return
+                }
+            }
+        }
+
         let fullURLStr: String
         if coverURL.hasPrefix("http://") || coverURL.hasPrefix("https://") {
             fullURLStr = coverURL
@@ -283,6 +336,8 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         self.onUpdate?()
     }
 
+    // MARK: - Playback Actions (Dispatched Exclusively to Music Studio)
+
     /// Plays a specific track selected from the Music Studio library.
     public func playTrack(_ track: MusicStudioTrack) {
         self.currentTrack = Track(
@@ -296,7 +351,7 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         self.currentTime = 0
         self.duration = track.duration ?? 0
 
-        // 1. Extract cover artwork immediately from local file or fetch from server
+        // Extract cover artwork immediately from local file or fetch from server
         let localFileURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Music/Music Studio")
             .appendingPathComponent(track.filename)
@@ -307,157 +362,77 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
             fetchCoverArtwork(coverURL: "/api/songs/artwork/\(encoded)")
         }
 
-        // 2. Dispatch play_track command to local Music Studio server
+        // Dispatch play_track command to Music Studio engine
         sendAction("play_track", additionalFields: [
             "filename": track.filename,
             "title": track.title
         ])
 
-        // 3. Update server playback state so Music Studio dock & mac_nowplaying are in sync
-        updateServerPlaybackState(track: track, isPlaying: true)
-
-        // 4. Native audio playback via AVPlayer
-        playLocalAudio(filename: track.filename)
-
         self.onUpdate?()
     }
 
-    private func playLocalAudio(filename: String) {
-        let localFileURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Music/Music Studio")
-            .appendingPathComponent(filename)
-
-        if FileManager.default.fileExists(atPath: localFileURL.path) {
-            setupAndPlay(item: AVPlayerItem(url: localFileURL))
-        } else if let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
-                  let streamURL = URL(string: "\(baseURL)/api/songs/audio/\(encoded)") {
-            setupAndPlay(item: AVPlayerItem(url: streamURL))
-        }
-    }
-
-    private func setupAndPlay(item: AVPlayerItem) {
-        if self.localPlayer == nil {
-            self.localPlayer = AVPlayer(playerItem: item)
-            self.localPlayer?.volume = 1.0
-            let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
-            self.localPlayer?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-                MainActor.assumeIsolated {
-                    guard let self = self, self.isPlaying else { return }
-                    self.currentTime = CMTimeGetSeconds(time)
-                    self.onUpdate?()
-                }
-            }
-        } else {
-            self.localPlayer?.replaceCurrentItem(with: item)
-        }
-
-        // Auto-advance observer when song ends
-        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
-        NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: item,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.next()
-            }
-        }
-
-        self.localPlayer?.play()
-    }
-
-    private func updateServerPlaybackState(track: MusicStudioTrack, isPlaying: Bool) {
-        guard let url = URL(string: "\(baseURL)/api/playback") else { return }
-        let encoded = track.filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? track.filename
-        let payload: [String: Any] = [
-            "is_playing": isPlaying,
-            "title": track.title,
-            "artist": track.artist,
-            "album": track.album,
-            "cover_url": "/api/songs/artwork/\(encoded)",
-            "current_time": currentTime,
-            "duration": track.duration ?? 0,
-            "index": libraryTracks.firstIndex(where: { $0.filename == track.filename }) ?? 0
-        ]
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
-
-        Task {
-            _ = try? await session.data(for: request)
-        }
-    }
-
-    // MARK: - Playback Actions
-
     public func play() {
-        if let current = currentTrack {
-            isPlaying = true
-            sendAction("play")
-            if localPlayer?.currentItem != nil {
-                localPlayer?.play()
-            } else if let track = libraryTracks.first(where: { $0.title == current.title }) {
-                playTrack(track)
-                return
-            } else if let first = libraryTracks.first {
-                playTrack(first)
-                return
-            }
-            if let track = libraryTracks.first(where: { $0.title == current.title }) {
-                updateServerPlaybackState(track: track, isPlaying: true)
-            }
-        } else if let first = libraryTracks.first {
-            playTrack(first)
-        }
+        self.isPlaying = true
+        sendAction("play")
         self.onUpdate?()
     }
 
     public func pause() {
-        localPlayer?.pause()
-        isPlaying = false
+        self.isPlaying = false
         sendAction("pause")
-        if let current = currentTrack, let track = libraryTracks.first(where: { $0.title == current.title }) {
-            updateServerPlaybackState(track: track, isPlaying: false)
-        }
         self.onUpdate?()
     }
 
     public func togglePlayPause() {
-        if isPlaying {
-            pause()
-        } else {
-            play()
-        }
+        self.isPlaying.toggle()
+        sendAction("toggle")
+        self.onUpdate?()
     }
 
     public func next() {
-        guard !libraryTracks.isEmpty else {
-            sendAction("next")
-            return
-        }
+        sendAction("next")
+        // If track is in library, predictively advance current track display
         if let current = currentTrack,
-           let currentIndex = libraryTracks.firstIndex(where: { $0.title == current.title }) {
+           let currentIndex = libraryTracks.firstIndex(where: { $0.title.lowercased() == current.title.lowercased() }) {
             let nextIndex = (currentIndex + 1) % libraryTracks.count
-            playTrack(libraryTracks[nextIndex])
-        } else if let first = libraryTracks.first {
-            playTrack(first)
+            let nextTrack = libraryTracks[nextIndex]
+            self.currentTrack = Track(
+                title: nextTrack.title,
+                artist: nextTrack.artist,
+                album: nextTrack.album,
+                duration: nextTrack.duration
+            )
+            let localFileURL = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Music/Music Studio")
+                .appendingPathComponent(nextTrack.filename)
+            if let img = Self.extractArtwork(from: localFileURL) {
+                self.artwork = img
+            }
         }
+        self.onUpdate?()
     }
 
     public func previous() {
-        guard !libraryTracks.isEmpty else {
-            sendAction("prev")
-            return
-        }
+        sendAction("prev")
+        // If track is in library, predictively rewind current track display
         if let current = currentTrack,
-           let currentIndex = libraryTracks.firstIndex(where: { $0.title == current.title }) {
+           let currentIndex = libraryTracks.firstIndex(where: { $0.title.lowercased() == current.title.lowercased() }) {
             let prevIndex = (currentIndex - 1 + libraryTracks.count) % libraryTracks.count
-            playTrack(libraryTracks[prevIndex])
-        } else if let first = libraryTracks.first {
-            playTrack(first)
+            let prevTrack = libraryTracks[prevIndex]
+            self.currentTrack = Track(
+                title: prevTrack.title,
+                artist: prevTrack.artist,
+                album: prevTrack.album,
+                duration: prevTrack.duration
+            )
+            let localFileURL = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Music/Music Studio")
+                .appendingPathComponent(prevTrack.filename)
+            if let img = Self.extractArtwork(from: localFileURL) {
+                self.artwork = img
+            }
         }
+        self.onUpdate?()
     }
 
     private func sendAction(_ action: String, additionalFields: [String: Any]? = nil) {
@@ -477,8 +452,8 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
 
         Task {
             _ = try? await session.data(for: request)
-            // Refresh state immediately following action
-            try? await Task.sleep(nanoseconds: 200_000_000)
+            // Query fresh playback state shortly after dispatching action
+            try? await Task.sleep(nanoseconds: 150_000_000)
             self.fetchPlaybackState()
         }
     }

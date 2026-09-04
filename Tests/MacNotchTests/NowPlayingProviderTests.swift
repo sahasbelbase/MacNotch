@@ -116,4 +116,27 @@ final class NowPlayingProviderTests: XCTestCase {
         XCTAssertEqual(provider.currentTrack?.artist, "Farhan Akhtar")
         XCTAssertTrue(provider.isAvailable)
     }
+
+    @MainActor
+    func testKeywordActionDefinitions() {
+        let playAction = MusicStudioListView.KeywordAction.play
+        let pauseAction = MusicStudioListView.KeywordAction.pause
+        let forwardAction = MusicStudioListView.KeywordAction.forward
+        let prevAction = MusicStudioListView.KeywordAction.previous
+
+        XCTAssertEqual(playAction.title, "Play")
+        XCTAssertEqual(pauseAction.title, "Pause")
+        XCTAssertEqual(forwardAction.title, "Forward (Next Song)")
+        XCTAssertEqual(prevAction.title, "Previous (Rewind)")
+
+        XCTAssertEqual(playAction.icon, "play.fill")
+        XCTAssertEqual(pauseAction.icon, "pause.fill")
+        XCTAssertEqual(forwardAction.icon, "forward.fill")
+        XCTAssertEqual(prevAction.icon, "backward.fill")
+
+        let track = MusicStudioTrack(filename: "test.mp3", title: "Test Song", artist: "Artist", album: "Album")
+        let trackAction = MusicStudioListView.KeywordAction.playTrack(track)
+        XCTAssertEqual(trackAction.title, "Play \"Test Song\"")
+        XCTAssertEqual(trackAction.icon, "play.circle.fill")
+    }
 }

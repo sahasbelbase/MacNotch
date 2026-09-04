@@ -64,6 +64,47 @@ final class NotchGeometryTests: XCTestCase {
         XCTAssertEqual(geo.expandedRect.maxY, 1117)
     }
 
+    func testDynamicGeometryOn13InchMacBookAir() {
+        // 13.6-inch MacBook Air M2/M3 (1470 x 956 default points)
+        let frame = CGRect(x: 0, y: 0, width: 1470, height: 956)
+        let cameraRect = CGRect(x: 628, y: 924, width: 214, height: 32)
+        let caps = DisplayCapabilities(
+            hasCameraNotch: true,
+            cameraHousingRect: cameraRect,
+            safeArea: CGRect(x: 0, y: 0, width: 1470, height: 924),
+            leftAuxiliaryArea: CGRect(x: 0, y: 924, width: 628, height: 32),
+            rightAuxiliaryArea: CGRect(x: 842, y: 924, width: 628, height: 32),
+            backingScaleFactor: 2.0
+        )
+
+        let geo = NotchGeometry.compute(from: caps, screenFrame: frame)!
+        // Dynamic ear minimum: max(680, 214 + 440 = 654) = 680
+        XCTAssertGreaterThanOrEqual(geo.expandedRect.width, 680)
+        XCTAssertEqual(geo.cameraExclusionRect?.width, 214)
+        XCTAssertEqual(geo.cameraExclusionRect?.height, 32)
+        XCTAssertEqual(geo.expandedRect.maxY, 956)
+    }
+
+    func testDynamicGeometryOn14InchMacBookPro() {
+        // 14.2-inch MacBook Pro M1/M2/M3/M4 (1512 x 982 default points)
+        let frame = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let cameraRect = CGRect(x: 653, y: 945, width: 206, height: 37)
+        let caps = DisplayCapabilities(
+            hasCameraNotch: true,
+            cameraHousingRect: cameraRect,
+            safeArea: CGRect(x: 0, y: 0, width: 1512, height: 945),
+            leftAuxiliaryArea: CGRect(x: 0, y: 945, width: 653, height: 37),
+            rightAuxiliaryArea: CGRect(x: 859, y: 945, width: 653, height: 37),
+            backingScaleFactor: 2.0
+        )
+
+        let geo = NotchGeometry.compute(from: caps, screenFrame: frame)!
+        XCTAssertGreaterThanOrEqual(geo.expandedRect.width, 680)
+        XCTAssertEqual(geo.cameraExclusionRect?.width, 206)
+        XCTAssertEqual(geo.cameraExclusionRect?.height, 37)
+        XCTAssertEqual(geo.expandedRect.maxY, 982)
+    }
+
     func testNonNotchDisplayReturnsNil() {
         let frame = CGRect(x: 0, y: 0, width: 1920, height: 1080)
         let caps = DisplayCapabilities(

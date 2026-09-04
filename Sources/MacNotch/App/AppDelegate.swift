@@ -68,6 +68,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // Embed root SwiftUI view into the floating panel
         let rootView = NotchView(
             appState: appState,
+            screenManager: screenManager,
             clipboardManager: clipboardManager,
             timeService: timeService,
             weatherService: weatherService,

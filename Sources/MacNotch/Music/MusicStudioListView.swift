@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Elegant, responsive track browser for the user's local "Music Studio" library.
-/// Supports search filtering, live playing indicator, track artwork, and instant playback.
+/// Supports search filtering, live playing indicator, track artwork, keyword function actions (play, pause, forward),
+/// and instant playback.
 public struct MusicStudioListView: View {
     @ObservedObject var musicStudioProvider: MusicStudioNowPlayingProvider
     @State private var searchText: String = ""
@@ -10,16 +11,93 @@ public struct MusicStudioListView: View {
         self.musicStudioProvider = musicStudioProvider
     }
 
+    public enum KeywordAction: Equatable {
+        case play
+        case pause
+        case forward
+        case previous
+        case playTrack(MusicStudioTrack)
+
+        public var title: String {
+            switch self {
+            case .play: return "Play"
+            case .pause: return "Pause"
+            case .forward: return "Forward (Next Song)"
+            case .previous: return "Previous (Rewind)"
+            case .playTrack(let track): return "Play \"\(track.title)\""
+            }
+        }
+
+        public var icon: String {
+            switch self {
+            case .play: return "play.fill"
+            case .pause: return "pause.fill"
+            case .forward: return "forward.fill"
+            case .previous: return "backward.fill"
+            case .playTrack: return "play.circle.fill"
+            }
+        }
+    }
+
+    private var detectedKeywordAction: KeywordAction? {
+        let trimmed = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !trimmed.isEmpty else { return nil }
+
+        if trimmed == "play" {
+            return .play
+        } else if trimmed == "pause" {
+            return .pause
+        } else if trimmed == "forward" || trimmed == "next" {
+            return .forward
+        } else if trimmed == "backward" || trimmed == "back" || trimmed == "prev" || trimmed == "previous" {
+            return .previous
+        } else if trimmed.hasPrefix("play ") {
+            let query = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+            if let match = musicStudioProvider.libraryTracks.first(where: {
+                $0.title.lowercased().contains(query) || $0.artist.lowercased().contains(query)
+            }) {
+                return .playTrack(match)
+            } else {
+                return .play
+            }
+        }
+        return nil
+    }
+
+    private func executeKeywordAction(_ action: KeywordAction) {
+        switch action {
+        case .play:
+            musicStudioProvider.play()
+        case .pause:
+            musicStudioProvider.pause()
+        case .forward:
+            musicStudioProvider.next()
+        case .previous:
+            musicStudioProvider.previous()
+        case .playTrack(let track):
+            musicStudioProvider.playTrack(track)
+        }
+    }
+
     private var filteredTracks: [MusicStudioTrack] {
         let tracks = musicStudioProvider.libraryTracks
-        guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else {
+        let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !query.isEmpty else {
             return tracks
         }
-        let query = searchText.lowercased()
+
+        // If query is an exact keyword like "play", "pause", "forward", don't overly filter the whole list away
+        if query == "play" || query == "pause" || query == "forward" || query == "next" || query == "prev" {
+            return tracks
+        }
+
+        let searchQuery = query.hasPrefix("play ") ? String(query.dropFirst(5)).trimmingCharacters(in: .whitespaces) : query
+        guard !searchQuery.isEmpty else { return tracks }
+
         return tracks.filter {
-            $0.title.lowercased().contains(query) ||
-            $0.artist.lowercased().contains(query) ||
-            $0.album.lowercased().contains(query)
+            $0.title.lowercased().contains(searchQuery) ||
+            $0.artist.lowercased().contains(searchQuery) ||
+            $0.album.lowercased().contains(searchQuery)
         }
     }
 
@@ -32,10 +110,17 @@ public struct MusicStudioListView: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(DesignSystem.Colors.textTertiary)
 
-                    TextField("Search \(musicStudioProvider.libraryTracks.count) songs...", text: $searchText)
+                    TextField("Search \(musicStudioProvider.libraryTracks.count) songs or type play, pause, forward...", text: $searchText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
                         .foregroundColor(DesignSystem.Colors.textPrimary)
+                        .onSubmit {
+                            if let action = detectedKeywordAction {
+                                executeKeywordAction(action)
+                            } else if let first = filteredTracks.first {
+                                musicStudioProvider.playTrack(first)
+                            }
+                        }
 
                     if !searchText.isEmpty {
                         Button(action: { searchText = "" }) {
@@ -74,6 +159,48 @@ public struct MusicStudioListView: View {
             }
             .padding(.horizontal, 4)
 
+            // Keyword Action Quick Execution Banner
+            if let action = detectedKeywordAction {
+                Button(action: {
+                    executeKeywordAction(action)
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: action.icon)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 20, height: 20)
+                            .background(Color.white.opacity(0.2))
+                            .clipShape(Circle())
+
+                        Text("Function: \(action.title)")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.white)
+
+                        Spacer()
+
+                        Text("Press ↵ Return")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.black.opacity(0.25))
+                            .clipShape(Capsule())
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.accentColor.opacity(0.85), Color.purple.opacity(0.85)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 4)
+            }
+
             // Scrollable Track List
             if filteredTracks.isEmpty {
                 VStack(spacing: 6) {
@@ -105,6 +232,21 @@ public struct MusicStudioListView: View {
             if musicStudioProvider.libraryTracks.isEmpty {
                 musicStudioProvider.fetchLibrary()
             }
+        }
+        .onKeyPress(.space) {
+            if searchText.isEmpty {
+                musicStudioProvider.togglePlayPause()
+                return .handled
+            }
+            return .ignored
+        }
+        .onKeyPress(.rightArrow) {
+            musicStudioProvider.next()
+            return .handled
+        }
+        .onKeyPress(.leftArrow) {
+            musicStudioProvider.previous()
+            return .handled
         }
     }
 
