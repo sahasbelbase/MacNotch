@@ -108,20 +108,94 @@ public struct ExpandedNotchView: View {
         .padding(.top, 2)
     }
 
-    // MARK: - Overview Hierarchy View (Music as Main Hero)
+    @State private var overviewLowerMode: OverviewLowerMode = .musicStudio
+
+    // MARK: - Overview Hierarchy View (Music as Main Hero, Music Studio List & Clips Below)
     private var overviewHierarchyView: some View {
         let settings = SettingsStore.shared
-        return VStack(spacing: 8) {
+        let trackCount = nowPlayingService.musicStudioProvider.libraryTracks.count
+        let clipCount = clipboardManager.items.count
+
+        return VStack(spacing: 6) {
             // Section 1: Prominent Music Hero Card
             if settings.showOverviewMusic {
-                MusicView(nowPlayingService: nowPlayingService, isCompact: false, isFullTab: false, isHero: true)
+                MusicView(
+                    nowPlayingService: nowPlayingService,
+                    isCompact: false,
+                    isFullTab: false,
+                    isHero: true,
+                    onOpenLibrary: {
+                        withAnimation(DesignSystem.Animation.tabSwitch) {
+                            overviewLowerMode = .musicStudio
+                        }
+                    }
+                )
             }
 
-            // Section 2: Quick-glance Clipboard Carousel below Music
-            if settings.showOverviewClipboard {
-                ClipboardView(clipboardManager: clipboardManager)
+            // Lower Section Switcher: [ 🎵 Music Studio (171) ] [ 📋 Recent Clips (80) ]
+            HStack(spacing: 6) {
+                Button(action: {
+                    withAnimation(DesignSystem.Animation.tabSwitch) {
+                        overviewLowerMode = .musicStudio
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "music.note.list")
+                            .font(.system(size: 9, weight: .semibold))
+                        Text("Music Studio List\(trackCount > 0 ? " (\(trackCount))" : "")")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3.5)
+                    .background(
+                        Capsule().fill(overviewLowerMode == .musicStudio ? Color.accentColor.opacity(0.2) : Color.white.opacity(0.06))
+                    )
+                    .foregroundColor(overviewLowerMode == .musicStudio ? .accentColor : DesignSystem.Colors.textSecondary)
+                }
+                .buttonStyle(.plain)
+
+                if settings.showOverviewClipboard {
+                    Button(action: {
+                        withAnimation(DesignSystem.Animation.tabSwitch) {
+                            overviewLowerMode = .clipboard
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.on.clipboard")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text("Recent Clips\(clipCount > 0 ? " (\(clipCount))" : "")")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 3.5)
+                        .background(
+                            Capsule().fill(overviewLowerMode == .clipboard ? Color.accentColor.opacity(0.2) : Color.white.opacity(0.06))
+                        )
+                        .foregroundColor(overviewLowerMode == .clipboard ? .accentColor : DesignSystem.Colors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer()
             }
+            .padding(.horizontal, 4)
+
+            // Section 2: Lower Content (Music Studio Song List or Clipboard Carousel)
+            Group {
+                if overviewLowerMode == .musicStudio {
+                    MusicStudioListView(musicStudioProvider: nowPlayingService.musicStudioProvider)
+                } else if settings.showOverviewClipboard {
+                    ClipboardView(clipboardManager: clipboardManager)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+}
+
+public enum OverviewLowerMode: String, CaseIterable, Identifiable {
+    case musicStudio = "Music Studio"
+    case clipboard = "Recent Clips"
+    public var id: String { rawValue }
 }

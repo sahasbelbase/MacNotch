@@ -6,17 +6,20 @@ public struct MusicView: View {
     public var isCompact: Bool = false
     public var isFullTab: Bool = false
     public var isHero: Bool = false
+    public var onOpenLibrary: (() -> Void)? = nil
 
     public init(
         nowPlayingService: SystemNowPlayingService,
         isCompact: Bool = false,
         isFullTab: Bool = false,
-        isHero: Bool = false
+        isHero: Bool = false,
+        onOpenLibrary: (() -> Void)? = nil
     ) {
         self.nowPlayingService = nowPlayingService
         self.isCompact = isCompact
         self.isFullTab = isFullTab
         self.isHero = isHero
+        self.onOpenLibrary = onOpenLibrary
     }
 
     public var body: some View {
@@ -99,6 +102,24 @@ public struct MusicView: View {
                             .padding(.vertical, 1)
                             .background(Color.accentColor.opacity(0.15))
                             .clipShape(Capsule())
+                    }
+
+                    if !nowPlayingService.musicStudioProvider.libraryTracks.isEmpty {
+                        Button(action: { onOpenLibrary?() }) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "music.note.list")
+                                    .font(.system(size: 8))
+                                Text("\(nowPlayingService.musicStudioProvider.libraryTracks.count) Songs")
+                                    .font(.system(size: 9, weight: .semibold))
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1.5)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Capsule())
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Browse Music Studio Library")
                     }
                 }
 

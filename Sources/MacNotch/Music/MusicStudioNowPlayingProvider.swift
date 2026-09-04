@@ -1,8 +1,45 @@
 import AppKit
+import AVFoundation
 import Foundation
 
+/// Represents a song in the user's local "Music Studio" library.
+public struct MusicStudioTrack: Identifiable, Codable, Hashable, Sendable {
+    public var id: String { filename }
+    public let filename: String
+    public let title: String
+    public let artist: String
+    public let album: String
+    public let year: String?
+    public let genre: String?
+    public let duration: Double?
+    public let size_mb: Double?
+    public let bitrate: String?
+
+    public init(
+        filename: String,
+        title: String,
+        artist: String,
+        album: String,
+        year: String? = nil,
+        genre: String? = nil,
+        duration: Double? = nil,
+        size_mb: Double? = nil,
+        bitrate: String? = nil
+    ) {
+        self.filename = filename
+        self.title = title
+        self.artist = artist
+        self.album = album
+        self.year = year
+        self.genre = genre
+        self.duration = duration
+        self.size_mb = size_mb
+        self.bitrate = bitrate
+    }
+}
+
 /// Native provider that communicates directly with the local "Music Studio" engine (port 5050).
-/// Supports live metadata (title, artist, album, duration, elapsed time) and transport actions.
+/// Supports live metadata (title, artist, album, duration, elapsed time), library browsing, and transport actions.
 @MainActor
 public final class MusicStudioNowPlayingProvider: NowPlayingProvider, ObservableObject {
     public let providerName: String = "Music Studio"
@@ -13,6 +50,7 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
     @Published public private(set) var isAvailable: Bool = false
     @Published public private(set) var currentTime: Double = 0
     @Published public private(set) var duration: Double = 0
+    @Published public private(set) var libraryTracks: [MusicStudioTrack] = []
 
     public var onUpdate: (() -> Void)?
 
@@ -20,6 +58,7 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
     private var pollTimer: Timer?
     private var lastCoverURL: String?
     private let session: URLSession
+    private var localPlayer: AVPlayer?
 
     public init() {
         let config = URLSessionConfiguration.ephemeral
@@ -27,6 +66,7 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         config.timeoutIntervalForResource = 1.5
         self.session = URLSession(configuration: config)
 
+        fetchLibrary()
         startPolling()
     }
 
@@ -139,38 +179,154 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         }
     }
 
+    // MARK: - Library Management
+
+    /// Fetches all songs from http://127.0.0.1:5050/api/songs with local folder fallback.
+    public func fetchLibrary() {
+        guard let url = URL(string: "\(baseURL)/api/songs") else {
+            scanLocalMusicFolder()
+            return
+        }
+
+        Task {
+            do {
+                let (data, response) = try await session.data(from: url)
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    let decoder = JSONDecoder()
+                    if let songs = try? decoder.decode([MusicStudioTrack].self, from: data) {
+                        await MainActor.run {
+                            self.libraryTracks = songs
+                            self.isAvailable = true
+                            self.onUpdate?()
+                        }
+                        return
+                    }
+                }
+            } catch {
+                // Fallback to local files
+            }
+
+            await MainActor.run {
+                self.scanLocalMusicFolder()
+            }
+        }
+    }
+
+    /// Fallback scan of ~/Music/Music Studio for .mp3 files when local server is offline.
+    private func scanLocalMusicFolder() {
+        let musicDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Music/Music Studio")
+        guard let files = try? FileManager.default.contentsOfDirectory(at: musicDir, includingPropertiesForKeys: nil) else { return }
+
+        let mp3Files = files.filter { $0.pathExtension.lowercased() == "mp3" }
+        var scanned: [MusicStudioTrack] = []
+        for file in mp3Files {
+            let filename = file.lastPathComponent
+            let baseName = file.deletingPathExtension().lastPathComponent
+            let parts = baseName.components(separatedBy: " - ")
+            let title = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : baseName
+            let artist = parts.count > 1 ? parts[0].trimmingCharacters(in: .whitespaces) : "Music Studio"
+
+            scanned.append(MusicStudioTrack(
+                filename: filename,
+                title: title,
+                artist: artist,
+                album: "Music Studio Library"
+            ))
+        }
+
+        self.libraryTracks = scanned.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        if !self.libraryTracks.isEmpty {
+            self.isAvailable = true
+        }
+        self.onUpdate?()
+    }
+
+    /// Plays a specific track selected from the Music Studio library.
+    public func playTrack(_ track: MusicStudioTrack) {
+        self.currentTrack = Track(
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            duration: track.duration
+        )
+        self.isPlaying = true
+        self.isAvailable = true
+
+        // 1. Dispatch play_track command to local Music Studio server
+        sendAction("play_track", additionalFields: [
+            "filename": track.filename,
+            "title": track.title
+        ])
+
+        // 2. Fetch track artwork
+        let encoded = track.filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? track.filename
+        fetchCoverArtwork(coverURL: "/api/songs/artwork/\(encoded)")
+
+        // 3. Native audio fallback for instant audio playback
+        let localFileURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Music/Music Studio")
+            .appendingPathComponent(track.filename)
+        if FileManager.default.fileExists(atPath: localFileURL.path) {
+            let item = AVPlayerItem(url: localFileURL)
+            if self.localPlayer == nil {
+                self.localPlayer = AVPlayer(playerItem: item)
+            } else {
+                self.localPlayer?.replaceCurrentItem(with: item)
+            }
+            self.localPlayer?.play()
+        }
+
+        self.onUpdate?()
+    }
+
     // MARK: - Playback Actions
 
     public func play() {
         sendAction("play")
+        localPlayer?.play()
         isPlaying = true
     }
 
     public func pause() {
         sendAction("pause")
+        localPlayer?.pause()
         isPlaying = false
     }
 
     public func togglePlayPause() {
         sendAction("toggle")
+        if isPlaying {
+            localPlayer?.pause()
+        } else {
+            localPlayer?.play()
+        }
         isPlaying.toggle()
     }
 
     public func next() {
         sendAction("next")
+        localPlayer?.pause()
     }
 
     public func previous() {
         sendAction("prev")
+        localPlayer?.pause()
     }
 
-    private func sendAction(_ action: String) {
+    private func sendAction(_ action: String, additionalFields: [String: Any]? = nil) {
         guard let url = URL(string: "\(baseURL)/api/playback/action") else { return }
+
+        var payload: [String: Any] = ["action": action]
+        if let extras = additionalFields {
+            for (key, val) in extras {
+                payload[key] = val
+            }
+        }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["action": action])
+        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
 
         Task {
             _ = try? await session.data(for: request)

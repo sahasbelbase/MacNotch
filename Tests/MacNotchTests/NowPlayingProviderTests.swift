@@ -88,4 +88,32 @@ final class NowPlayingProviderTests: XCTestCase {
         XCTAssertNil(provider.currentTrack)
         XCTAssertNil(provider.artwork)
     }
+
+    @MainActor
+    func testMusicStudioTrackModelAndPlayback() {
+        let track = MusicStudioTrack(
+            filename: "Socha Hai.mp3",
+            title: "Socha Hai",
+            artist: "Farhan Akhtar",
+            album: "Rock On!!",
+            year: "2010",
+            genre: "Bollywood",
+            duration: 262.0,
+            size_mb: 10.39,
+            bitrate: "320 kbps"
+        )
+
+        XCTAssertEqual(track.id, "Socha Hai.mp3")
+        XCTAssertEqual(track.title, "Socha Hai")
+        XCTAssertEqual(track.artist, "Farhan Akhtar")
+        XCTAssertEqual(track.duration, 262.0)
+
+        let provider = MusicStudioNowPlayingProvider()
+        provider.playTrack(track)
+
+        XCTAssertTrue(provider.isPlaying)
+        XCTAssertEqual(provider.currentTrack?.title, "Socha Hai")
+        XCTAssertEqual(provider.currentTrack?.artist, "Farhan Akhtar")
+        XCTAssertTrue(provider.isAvailable)
+    }
 }
