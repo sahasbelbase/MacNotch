@@ -74,6 +74,17 @@ public final class MouseTracker: ObservableObject {
             return
         }
 
+        // Multi-Monitor Isolation:
+        // Ensure cursor is physically on the built-in display that possesses the notch.
+        // If the user's cursor is on an external monitor or off-screen, cancel hover activation.
+        guard let activeScreen = screenManager.activeScreen,
+              activeScreen.frame.contains(screenLocation) else {
+            if appState.currentState == .activating || appState.currentState == .expanded {
+                appState.handleMouseExit()
+            }
+            return
+        }
+
         let isInsideActivation = geometry.activationRect.contains(screenLocation)
         let expandedRect = geometry.expandedRect
         // Provide 10pt safety margin around the expanded frame so cursor can navigate easily

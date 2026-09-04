@@ -90,4 +90,43 @@ final class DisplayCapabilitiesTests: XCTestCase {
         XCTAssertFalse(caps.hasCameraNotch)
         XCTAssertNil(caps.cameraHousingRect)
     }
+
+    func testExternalMonitorExplicitlyRejectsNotch() {
+        // Even if an external monitor had unusual safeAreaInsets, isBuiltin == false guarantees NO notch
+        let frame = CGRect(x: 1800, y: 0, width: 2560, height: 1440)
+        let leftAux = CGRect(x: 1800, y: 1400, width: 1100, height: 40)
+        let rightAux = CGRect(x: 3000, y: 1400, width: 1360, height: 40)
+        let safeArea = CGRect(x: 1800, y: 0, width: 2560, height: 1400)
+
+        let caps = DisplayCapabilities(
+            isBuiltin: false,
+            hasCameraNotch: false,
+            cameraHousingRect: nil,
+            safeArea: safeArea,
+            leftAuxiliaryArea: leftAux,
+            rightAuxiliaryArea: rightAux,
+            backingScaleFactor: 2.0
+        )
+
+        XCTAssertFalse(caps.isBuiltin)
+        XCTAssertFalse(caps.hasCameraNotch)
+        XCTAssertNil(caps.cameraHousingRect)
+
+        // NotchGeometry computation must return nil for any external monitor
+        let geo = NotchGeometry.compute(from: caps, screenFrame: frame)
+        XCTAssertNil(geo, "Notch geometry must NEVER be created for an external monitor")
+    }
+
+    func testBuiltinScreenDetectionOnConnectedScreens() {
+        // If NSScreen.screens contains the built-in display, verify isBuiltinDisplay works correctly
+        for screen in NSScreen.screens {
+            let isBuiltin = DisplayCapabilities.isBuiltinDisplay(screen)
+            let caps = DisplayCapabilities.evaluate(for: screen)
+            XCTAssertEqual(caps.isBuiltin, isBuiltin)
+            if !isBuiltin {
+                XCTAssertFalse(caps.hasCameraNotch, "External screen must never have camera notch")
+                XCTAssertNil(caps.cameraHousingRect, "External screen must never have camera housing rect")
+            }
+        }
+    }
 }

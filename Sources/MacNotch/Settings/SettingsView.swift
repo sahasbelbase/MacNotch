@@ -188,6 +188,7 @@ public struct SettingsView: View {
                 }
 
                 if let caps = screenManager.currentCapabilities {
+                    diagnosticRow("Display Type:", caps.isBuiltin ? "Built-in Display (Internal)" : "External Display")
                     diagnosticRow("Auxiliary Top Left:", caps.leftAuxiliaryArea.map { formatRect($0) } ?? "None")
                     diagnosticRow("Auxiliary Top Right:", caps.rightAuxiliaryArea.map { formatRect($0) } ?? "None")
                 }
