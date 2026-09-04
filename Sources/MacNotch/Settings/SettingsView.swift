@@ -18,6 +18,11 @@ public struct SettingsView: View {
                     Label("General", systemImage: "gear")
                 }
 
+            sectionsTab
+                .tabItem {
+                    Label("Layout", systemImage: "square.grid.2x2")
+                }
+
             clipboardTab
                 .tabItem {
                     Label("Clipboard", systemImage: "doc.on.clipboard")
@@ -39,7 +44,7 @@ public struct SettingsView: View {
                 }
         }
         .padding(20)
-        .frame(width: 480, height: 340)
+        .frame(width: 520, height: 380)
     }
 
     // MARK: - General Tab
@@ -49,7 +54,24 @@ public struct SettingsView: View {
             Section {
                 Toggle("Enable MacNotch Interaction", isOn: $settings.enableNotch)
 
-                Toggle("Launch at Login", isOn: $settings.launchAtLogin)
+                HStack {
+                    Toggle("Launch at Login (Start on Boot)", isOn: Binding(
+                        get: { settings.launchAtLogin },
+                        set: { settings.setLaunchAtLogin($0) }
+                    ))
+
+                    Spacer()
+
+                    if settings.isLaunchAtLoginActive {
+                        Text("Active")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.green)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.green.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                }
             }
 
             Section("Hover Delays") {
@@ -72,6 +94,39 @@ public struct SettingsView: View {
                     }
                     Slider(value: $settings.collapseDelay, in: 0.20...0.80, step: 0.05)
                 }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // MARK: - Sections & Layout Tab
+
+    private var sectionsTab: some View {
+        Form {
+            Section("Default Startup Tab") {
+                Picker("Default Tab on Expand", selection: $settings.defaultTab) {
+                    ForEach(NotchTab.allCases) { tab in
+                        Text(tab.rawValue).tag(tab.rawValue)
+                    }
+                }
+            }
+
+            Section("Overview Hierarchy Sections") {
+                Toggle("Show Music Hero Player", isOn: $settings.showOverviewMusic)
+                Toggle("Show Recent Clipboard Carousel", isOn: $settings.showOverviewClipboard)
+            }
+
+            Section("Music Player Integration") {
+                Picker("Preferred Audio Source", selection: $settings.musicSource) {
+                    Text("Automatic (Music Studio / MediaRemote)").tag("Auto")
+                    Text("Music Studio (Local Server :5050)").tag("MusicStudio")
+                    Text("Apple Music").tag("Music")
+                    Text("Spotify").tag("Spotify")
+                }
+
+                Text("Music Studio is automatically detected at http://127.0.0.1:5050 when running.")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)

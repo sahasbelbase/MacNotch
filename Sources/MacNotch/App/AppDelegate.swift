@@ -34,11 +34,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         self.appState.isEnabled = settings.enableNotch
         self.appState.hoverActivationDelay = settings.hoverDelay
         self.appState.collapseDelay = settings.collapseDelay
+        if let tab = NotchTab(rawValue: settings.defaultTab) {
+            self.appState.selectedTab = tab
+        }
         self.clipboardManager.filterSensitiveData = settings.filterSensitive
         if let policy = ClipboardDuplicatePolicy(rawValue: settings.duplicatePolicy) {
             self.clipboardManager.duplicatePolicy = policy
         }
-        self.clipboardManager.retentionLimit = RetentionLimit(rawValue: settings.clipboardRetention) ?? .hundred
+        self.clipboardManager.retentionLimit = RetentionLimit(rawValue: settings.clipboardRetention) ?? .eighty
+
+        // Ensure Launch at Login is synchronized with system Login Items
+        if settings.launchAtLogin {
+            settings.setLaunchAtLogin(true)
+        }
 
         // Apply saved theme
         if settings.appAppearance == "Dark" {
@@ -50,6 +58,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize window and mouse tracking
         self.windowManager = WindowManager(appState: appState, screenManager: screenManager)
         self.mouseTracker = MouseTracker(appState: appState, screenManager: screenManager)
+
+        // Configure shared Settings controller
+        SettingsWindowController.shared.configure(
+            screenManager: screenManager,
+            clipboardManager: clipboardManager
+        )
 
         // Embed root SwiftUI view into the floating panel
         let rootView = NotchView(

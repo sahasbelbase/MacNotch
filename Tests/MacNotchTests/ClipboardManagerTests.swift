@@ -69,6 +69,19 @@ final class ClipboardManagerTests: XCTestCase {
         XCTAssertEqual(manager.items.count, 50)
     }
 
+    func testEightyItemsRetentionLimit() {
+        manager.retentionLimit = .eighty
+        XCTAssertEqual(manager.retentionLimit.rawValue, 80)
+        XCTAssertTrue(manager.retentionLimit.description.contains("80 items"))
+
+        for i in 0..<100 {
+            let item = ClipboardItem(type: .text, preview: "Item \(i)", textContent: "Item \(i)")
+            manager.add(item: item)
+        }
+
+        XCTAssertEqual(manager.items.count, 80)
+    }
+
     // MARK: - 5. Clear History
     func testClearHistory() {
         manager.add(item: ClipboardItem(type: .text, preview: "Sample", textContent: "Sample"))

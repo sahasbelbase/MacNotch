@@ -4,6 +4,7 @@ import AppKit
 /// Retention limit options for clipboard history.
 public enum RetentionLimit: Int, CaseIterable, Identifiable, Codable, Sendable {
     case fifty = 50
+    case eighty = 80
     case hundred = 100
     case fiveHundred = 500
     case unlimited = 0
@@ -13,6 +14,7 @@ public enum RetentionLimit: Int, CaseIterable, Identifiable, Codable, Sendable {
     public var description: String {
         switch self {
         case .fifty: return "50 items"
+        case .eighty: return "80 items (Recommended)"
         case .hundred: return "100 items"
         case .fiveHundred: return "500 items"
         case .unlimited: return "Unlimited"

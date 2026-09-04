@@ -22,8 +22,9 @@ public enum NotchState: String, CaseIterable, Sendable {
 /// Active tab in the expanded notch utility.
 public enum NotchTab: String, CaseIterable, Identifiable, Sendable {
     case overview = "Overview"
-    case clipboard = "Clipboard"
     case music = "Music"
+    case clipboard = "Clipboard"
+    case calendar = "Calendar"
     case weather = "Weather"
 
     public var id: String { rawValue }
@@ -31,8 +32,9 @@ public enum NotchTab: String, CaseIterable, Identifiable, Sendable {
     public var icon: String {
         switch self {
         case .overview: return "square.grid.2x2"
-        case .clipboard: return "doc.on.clipboard"
         case .music: return "music.note"
+        case .clipboard: return "doc.on.clipboard"
+        case .calendar: return "calendar"
         case .weather: return "cloud.sun"
         }
     }

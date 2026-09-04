@@ -17,10 +17,16 @@ public final class SettingsStore: ObservableObject {
     }
 
     // MARK: - Clipboard Settings
-    @AppStorage("clipboardRetention") public var clipboardRetention: Int = 100
+    @AppStorage("clipboardRetention") public var clipboardRetention: Int = 80
     @AppStorage("clipboardAutoDelete") public var clipboardAutoDelete: String = AutoDeletePeriod.never.rawValue
     @AppStorage("filterSensitive") public var filterSensitive: Bool = true
     @AppStorage("duplicatePolicy") public var duplicatePolicy: String = ClipboardDuplicatePolicy.moveToTop.rawValue
+
+    // MARK: - Music & Layout Customization Settings
+    @AppStorage("musicSource") public var musicSource: String = "Auto"
+    @AppStorage("showOverviewMusic") public var showOverviewMusic: Bool = true
+    @AppStorage("showOverviewClipboard") public var showOverviewClipboard: Bool = true
+    @AppStorage("defaultTab") public var defaultTab: String = "Overview"
 
     // MARK: - Weather Settings
     @AppStorage("selectedLocationId") public var selectedLocationId: String = "ktm"
@@ -33,8 +39,26 @@ public final class SettingsStore: ObservableObject {
     public init() {
         // Sync launch at login status with SMAppService if available
         if #available(macOS 13.0, *) {
-            self.launchAtLogin = (SMAppService.mainApp.status == .enabled)
+            let isServiceEnabled = (SMAppService.mainApp.status == .enabled)
+            if launchAtLogin && !isServiceEnabled {
+                updateLaunchAtLogin(true)
+            } else if !launchAtLogin && isServiceEnabled {
+                self.launchAtLogin = true
+            }
         }
+    }
+
+    /// Explicitly updates launch at login with system ServiceManagement registration.
+    public func setLaunchAtLogin(_ enabled: Bool) {
+        launchAtLogin = enabled
+        updateLaunchAtLogin(enabled)
+    }
+
+    public var isLaunchAtLoginActive: Bool {
+        if #available(macOS 13.0, *) {
+            return SMAppService.mainApp.status == .enabled
+        }
+        return launchAtLogin
     }
 
     private func updateLaunchAtLogin(_ enabled: Bool) {
@@ -60,11 +84,15 @@ public final class SettingsStore: ObservableObject {
         enableNotch = true
         hoverDelay = 0.12
         collapseDelay = 0.35
-        launchAtLogin = false
-        clipboardRetention = 100
+        setLaunchAtLogin(false)
+        clipboardRetention = 80
         clipboardAutoDelete = AutoDeletePeriod.never.rawValue
         filterSensitive = true
         duplicatePolicy = ClipboardDuplicatePolicy.moveToTop.rawValue
+        musicSource = "Auto"
+        showOverviewMusic = true
+        showOverviewClipboard = true
+        defaultTab = "Overview"
         selectedLocationId = "ktm"
         tempUnit = TemperatureUnit.celsius.rawValue
         appAppearance = "System"

@@ -11,7 +11,7 @@ public final class ClipboardManager: ObservableObject {
     @Published public var searchQuery: String = ""
     @Published public var isPaused: Bool = false
     @Published public var filterSensitiveData: Bool = true
-    @Published public var retentionLimit: RetentionLimit = .hundred
+    @Published public var retentionLimit: RetentionLimit = .eighty
     @Published public var autoDeletePeriod: AutoDeletePeriod = .never
     @Published public var duplicatePolicy: ClipboardDuplicatePolicy = .moveToTop
 

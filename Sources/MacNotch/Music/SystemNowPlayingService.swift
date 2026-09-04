@@ -12,12 +12,15 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
     @Published public private(set) var activePlayerName: String?
 
     public let mediaRemoteProvider: MediaRemoteNowPlayingProvider
+    public let musicStudioProvider: MusicStudioNowPlayingProvider
     private var musicObserver: NSObjectProtocol?
     private var spotifyObserver: NSObjectProtocol?
     private let scriptQueue = DispatchQueue(label: "com.macnotch.nowplaying.script", qos: .userInitiated)
 
     public init() {
         self.mediaRemoteProvider = MediaRemoteNowPlayingProvider()
+        self.musicStudioProvider = MusicStudioNowPlayingProvider()
+        setupMusicStudioProvider()
         setupMediaRemoteProvider()
         setupDistributedObservers()
         checkInitialPlaybackState()
@@ -32,10 +35,47 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
         }
     }
 
+    private func setupMusicStudioProvider() {
+        musicStudioProvider.onUpdate = { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self = self else { return }
+                if self.musicStudioProvider.isAvailable, let track = self.musicStudioProvider.currentTrack {
+                    self.currentTrack = track
+                    self.isPlaying = self.musicStudioProvider.isPlaying
+                    self.artwork = self.musicStudioProvider.artwork
+                    self.activePlayerName = "Music Studio"
+                } else if self.activePlayerName == "Music Studio" && !self.musicStudioProvider.isAvailable {
+                    if let mrTrack = self.mediaRemoteProvider.currentTrack {
+                        self.currentTrack = mrTrack
+                        self.isPlaying = self.mediaRemoteProvider.isPlaying
+                        self.artwork = self.mediaRemoteProvider.artwork
+                        self.activePlayerName = self.mediaRemoteProvider.providerName
+                    } else {
+                        self.currentTrack = nil
+                        self.isPlaying = false
+                        self.artwork = nil
+                    }
+                }
+            }
+        }
+
+        if musicStudioProvider.isAvailable, let track = musicStudioProvider.currentTrack {
+            self.currentTrack = track
+            self.isPlaying = musicStudioProvider.isPlaying
+            self.artwork = musicStudioProvider.artwork
+            self.activePlayerName = "Music Studio"
+        }
+    }
+
     private func setupMediaRemoteProvider() {
         mediaRemoteProvider.onUpdate = { [weak self] in
             MainActor.assumeIsolated {
                 guard let self = self else { return }
+                // Only use MediaRemote if Music Studio is not actively playing
+                if self.activePlayerName == "Music Studio" && self.musicStudioProvider.isAvailable && self.musicStudioProvider.isPlaying {
+                    return
+                }
+
                 if let track = self.mediaRemoteProvider.currentTrack {
                     self.currentTrack = track
                     self.isPlaying = self.mediaRemoteProvider.isPlaying
@@ -49,7 +89,7 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
             }
         }
 
-        if let track = mediaRemoteProvider.currentTrack {
+        if currentTrack == nil, let track = mediaRemoteProvider.currentTrack {
             self.currentTrack = track
             self.isPlaying = mediaRemoteProvider.isPlaying
             self.artwork = mediaRemoteProvider.artwork
@@ -158,7 +198,9 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
     // MARK: - Playback Controls
 
     public func play() {
-        if mediaRemoteProvider.isAvailable {
+        if activePlayerName == "Music Studio" && musicStudioProvider.isAvailable {
+            musicStudioProvider.play()
+        } else if mediaRemoteProvider.isAvailable {
             mediaRemoteProvider.play()
         } else {
             executeAppleScriptCommand("play")
@@ -167,7 +209,9 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
     }
 
     public func pause() {
-        if mediaRemoteProvider.isAvailable {
+        if activePlayerName == "Music Studio" && musicStudioProvider.isAvailable {
+            musicStudioProvider.pause()
+        } else if mediaRemoteProvider.isAvailable {
             mediaRemoteProvider.pause()
         } else {
             executeAppleScriptCommand("pause")
@@ -176,7 +220,9 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
     }
 
     public func togglePlayPause() {
-        if mediaRemoteProvider.isAvailable {
+        if activePlayerName == "Music Studio" && musicStudioProvider.isAvailable {
+            musicStudioProvider.togglePlayPause()
+        } else if mediaRemoteProvider.isAvailable {
             mediaRemoteProvider.togglePlayPause()
         } else {
             executeAppleScriptCommand("playpause")
@@ -185,7 +231,9 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
     }
 
     public func next() {
-        if mediaRemoteProvider.isAvailable {
+        if activePlayerName == "Music Studio" && musicStudioProvider.isAvailable {
+            musicStudioProvider.next()
+        } else if mediaRemoteProvider.isAvailable {
             mediaRemoteProvider.next()
         } else {
             executeAppleScriptCommand("next track")
@@ -193,7 +241,9 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
     }
 
     public func previous() {
-        if mediaRemoteProvider.isAvailable {
+        if activePlayerName == "Music Studio" && musicStudioProvider.isAvailable {
+            musicStudioProvider.previous()
+        } else if mediaRemoteProvider.isAvailable {
             mediaRemoteProvider.previous()
         } else {
             executeAppleScriptCommand("previous track")

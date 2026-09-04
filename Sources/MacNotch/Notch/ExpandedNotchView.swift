@@ -37,10 +37,12 @@ public struct ExpandedNotchView: View {
                 switch appState.selectedTab {
                 case .overview:
                     overviewHierarchyView
-                case .clipboard:
-                    ClipboardView(clipboardManager: clipboardManager)
                 case .music:
                     MusicView(nowPlayingService: nowPlayingService, isCompact: false, isFullTab: true)
+                case .clipboard:
+                    ClipboardView(clipboardManager: clipboardManager)
+                case .calendar:
+                    CalendarView(timeService: timeService)
                 case .weather:
                     WeatherView(weatherService: weatherService, isCompact: false)
                 }
@@ -90,16 +92,25 @@ public struct ExpandedNotchView: View {
 
             Spacer(minLength: 12)
 
-            // Status Pills (Time & Weather)
+            // Status Pill (Time) & In-Notch Settings Button
             HStack(spacing: 8) {
                 TimeView(timeService: timeService, isCompact: true)
-                Text("•")
-                    .foregroundColor(DesignSystem.Colors.textTertiary)
-                    .font(.system(size: 8))
-                WeatherView(weatherService: weatherService, isCompact: true)
+
+                Button(action: {
+                    SettingsWindowController.shared.showSettings(clipboardManager: clipboardManager)
+                }) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                        .frame(width: 22, height: 22)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Open MacNotch Settings")
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
             .background(
                 Capsule()
                     .fill(Color.black.opacity(0.35))
@@ -109,14 +120,19 @@ public struct ExpandedNotchView: View {
         .padding(.top, 2)
     }
 
-    // MARK: - Overview Hierarchy View (Zero-overlap vertical arrangement)
+    // MARK: - Overview Hierarchy View (Music as Main Hero)
     private var overviewHierarchyView: some View {
-        VStack(spacing: 8) {
-            // Row 2: Full-width Music bar with dedicated controls
-            MusicView(nowPlayingService: nowPlayingService, isCompact: false, isFullTab: false)
+        let settings = SettingsStore.shared
+        return VStack(spacing: 8) {
+            // Section 1: Prominent Music Hero Card
+            if settings.showOverviewMusic {
+                MusicView(nowPlayingService: nowPlayingService, isCompact: false, isFullTab: false, isHero: true)
+            }
 
-            // Row 3: Full-width Clipboard Carousel
-            ClipboardView(clipboardManager: clipboardManager)
+            // Section 2: Quick-glance Clipboard Carousel below Music
+            if settings.showOverviewClipboard {
+                ClipboardView(clipboardManager: clipboardManager)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -45,10 +45,25 @@ public struct ClipboardCardView: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(DesignSystem.Colors.textSecondary)
 
+                    // Explicit Pin Button (always visible if pinned, visible on hover if unpinned)
                     if item.isPinned {
-                        Image(systemName: "pin.fill")
-                            .font(.system(size: 8))
-                            .foregroundColor(.orange)
+                        Button(action: onTogglePin) {
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.orange)
+                                .padding(2)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Unpin item")
+                    } else if isHovered {
+                        Button(action: onTogglePin) {
+                            Image(systemName: "pin")
+                                .font(.system(size: 10))
+                                .foregroundColor(DesignSystem.Colors.textTertiary)
+                                .padding(2)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Pin to top")
                     }
 
                     Spacer()

@@ -79,4 +79,13 @@ final class NowPlayingProviderTests: XCTestCase {
         XCTAssertEqual(track.album, "Album Name")
         XCTAssertEqual(track.duration, 245.5)
     }
+
+    @MainActor
+    func testMusicStudioProviderInitialization() {
+        let provider = MusicStudioNowPlayingProvider()
+        XCTAssertEqual(provider.providerName, "Music Studio")
+        XCTAssertFalse(provider.isPlaying)
+        XCTAssertNil(provider.currentTrack)
+        XCTAssertNil(provider.artwork)
+    }
 }

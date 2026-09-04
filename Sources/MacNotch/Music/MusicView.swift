@@ -5,16 +5,25 @@ public struct MusicView: View {
     @ObservedObject var nowPlayingService: SystemNowPlayingService
     public var isCompact: Bool = false
     public var isFullTab: Bool = false
+    public var isHero: Bool = false
 
-    public init(nowPlayingService: SystemNowPlayingService, isCompact: Bool = false, isFullTab: Bool = false) {
+    public init(
+        nowPlayingService: SystemNowPlayingService,
+        isCompact: Bool = false,
+        isFullTab: Bool = false,
+        isHero: Bool = false
+    ) {
         self.nowPlayingService = nowPlayingService
         self.isCompact = isCompact
         self.isFullTab = isFullTab
+        self.isHero = isHero
     }
 
     public var body: some View {
         if isCompact {
             compactView
+        } else if isHero {
+            heroCardView
         } else if isFullTab {
             fullTabView
         } else {
@@ -42,6 +51,112 @@ public struct MusicView: View {
                     .foregroundColor(DesignSystem.Colors.textSecondary)
             }
         }
+    }
+
+    // MARK: - Hero Card View (Used as Main Hero in Overview tab)
+    private var heroCardView: some View {
+        HStack(spacing: 14) {
+            // Album Art or Music Gradient Icon (54x54)
+            if let artwork = nowPlayingService.artwork {
+                Image(nsImage: artwork)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 52, height: 52)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.pink.opacity(0.85), Color.purple.opacity(0.85)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    Image(systemName: nowPlayingService.isPlaying ? "waveform" : "music.note")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+                .frame(width: 52, height: 52)
+                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 1)
+            }
+
+            // Track Details & Player Badge
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(nowPlayingService.currentTrack?.title ?? "No Track Playing")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    if let player = nowPlayingService.activePlayerName {
+                        Text(player)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.accentColor)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.accentColor.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                }
+
+                Text(nowPlayingService.currentTrack?.artist ?? (nowPlayingService.activePlayerName ?? "System Audio"))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                if let album = nowPlayingService.currentTrack?.album, !album.isEmpty {
+                    Text(album)
+                        .font(.system(size: 10))
+                        .foregroundColor(DesignSystem.Colors.textTertiary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(0)
+
+            // Transport Controls with large click targets
+            HStack(spacing: 10) {
+                Button(action: { nowPlayingService.previous() }) {
+                    Image(systemName: "backward.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                        .frame(width: 28, height: 28)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+
+                Button(action: { nowPlayingService.togglePlayPause() }) {
+                    Image(systemName: nowPlayingService.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white)
+                        .frame(width: 34, height: 34)
+                        .background(Color.accentColor)
+                        .clipShape(Circle())
+                        .shadow(color: Color.accentColor.opacity(0.4), radius: 4, x: 0, y: 2)
+                }
+                .buttonStyle(.plain)
+
+                Button(action: { nowPlayingService.next() }) {
+                    Image(systemName: "forward.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                        .frame(width: 28, height: 28)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+            .layoutPriority(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .macNotchCardStyle()
     }
 
     // MARK: - Horizontal Bar View (Used in Overview row - guaranteed zero text/icon overlap)

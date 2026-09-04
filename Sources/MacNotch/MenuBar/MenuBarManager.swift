@@ -159,34 +159,11 @@ public final class MenuBarManager: NSObject {
     }
 
     @objc public func openSettings() {
-        if let controller = settingsWindowController {
-            controller.showWindow(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
-        }
-
-        let settingsView = SettingsView(
-            screenManager: ScreenManager(),
-            clipboardManager: clipboardManager
-        )
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 340),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        window.center()
-        window.title = "MacNotch Settings"
-        window.contentView = NSHostingView(rootView: settingsView)
-        window.isReleasedWhenClosed = false
-
-        settingsWindowController = NSWindowController(window: window)
-        settingsWindowController?.showWindow(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        SettingsWindowController.shared.showSettings(clipboardManager: clipboardManager)
     }
 
     @objc private func toggleLaunchAtLogin() {
-        settingsStore.launchAtLogin.toggle()
+        settingsStore.setLaunchAtLogin(!settingsStore.launchAtLogin)
         rebuildMenu()
     }
 
