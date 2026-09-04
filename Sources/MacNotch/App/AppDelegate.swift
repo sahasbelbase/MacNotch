@@ -35,6 +35,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         self.appState.hoverActivationDelay = settings.hoverDelay
         self.appState.collapseDelay = settings.collapseDelay
         self.clipboardManager.filterSensitiveData = settings.filterSensitive
+        if let policy = ClipboardDuplicatePolicy(rawValue: settings.duplicatePolicy) {
+            self.clipboardManager.duplicatePolicy = policy
+        }
+        self.clipboardManager.retentionLimit = RetentionLimit(rawValue: settings.clipboardRetention) ?? .hundred
 
         // Apply saved theme
         if settings.appAppearance == "Dark" {

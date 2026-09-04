@@ -5,16 +5,16 @@ import XCTest
 final class AppStateTests: XCTestCase {
     var appState: AppState!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         appState = AppState()
         appState.hoverActivationDelay = 0.05
         appState.collapseDelay = 0.05
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         appState.cancelAllTasks()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testInitialState() {

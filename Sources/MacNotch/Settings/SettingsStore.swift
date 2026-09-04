@@ -20,6 +20,7 @@ public final class SettingsStore: ObservableObject {
     @AppStorage("clipboardRetention") public var clipboardRetention: Int = 100
     @AppStorage("clipboardAutoDelete") public var clipboardAutoDelete: String = AutoDeletePeriod.never.rawValue
     @AppStorage("filterSensitive") public var filterSensitive: Bool = true
+    @AppStorage("duplicatePolicy") public var duplicatePolicy: String = ClipboardDuplicatePolicy.moveToTop.rawValue
 
     // MARK: - Weather Settings
     @AppStorage("selectedLocationId") public var selectedLocationId: String = "ktm"
@@ -62,6 +63,7 @@ public final class SettingsStore: ObservableObject {
         clipboardRetention = 100
         clipboardAutoDelete = AutoDeletePeriod.never.rawValue
         filterSensitive = true
+        duplicatePolicy = ClipboardDuplicatePolicy.moveToTop.rawValue
         selectedLocationId = "ktm"
         tempUnit = TemperatureUnit.celsius.rawValue
         appAppearance = "System"

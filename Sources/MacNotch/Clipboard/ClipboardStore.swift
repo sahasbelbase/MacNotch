@@ -66,7 +66,7 @@ public final class ClipboardStore: @unchecked Sendable {
         try? fileManager.createDirectory(at: imagesDirectoryURL, withIntermediateDirectories: true)
     }
 
-    /// Loads history from disk, applying expiration filters.
+    /// Loads history from disk, applying expiration filters while strictly protecting pinned items.
     public func loadHistory(autoDeletePeriod: AutoDeletePeriod = .never) -> [ClipboardItem] {
         guard fileManager.fileExists(atPath: historyFileURL.path) else {
             return []
@@ -78,20 +78,20 @@ public final class ClipboardStore: @unchecked Sendable {
             decoder.dateDecodingStrategy = .iso8601
             var items = try decoder.decode([ClipboardItem].self, from: data)
 
-            // Apply auto-delete filter
+            // Apply auto-delete filter to unpinned items only
             if let maxAge = autoDeletePeriod.timeInterval {
                 let cutoff = Date().addingTimeInterval(-maxAge)
-                items = items.filter { $0.timestamp >= cutoff }
+                items = items.filter { $0.isPinned || $0.timestamp >= cutoff }
             }
 
             return items
         } catch {
-            print("Failed to load clipboard history: \(error)")
+            print("Failed to load clipboard history (attempting graceful fallback): \(error)")
             return []
         }
     }
 
-    /// Saves history to disk, respecting retention limit.
+    /// Saves history to disk, respecting retention limit while protecting pinned items.
     public func saveHistory(_ items: [ClipboardItem], limit: RetentionLimit = .hundred) {
         queue.async { [weak self] in
             guard let self = self else { return }
@@ -108,9 +108,25 @@ public final class ClipboardStore: @unchecked Sendable {
 
     private func saveHistoryDirect(_ items: [ClipboardItem], limit: RetentionLimit) {
         createDirectoriesIfNeeded()
+
+        // Enforce retention limit: pinned items are protected!
         var constrainedItems = items
-        if limit != .unlimited && constrainedItems.count > limit.rawValue {
-            constrainedItems = Array(constrainedItems.prefix(limit.rawValue))
+        if limit != .unlimited {
+            let maxTotal = limit.rawValue
+            let pinned = items.filter { $0.isPinned }
+            let unpinned = items.filter { !$0.isPinned }
+
+            let remainingSlots = max(0, maxTotal - pinned.count)
+            let trimmedUnpinned = Array(unpinned.prefix(remainingSlots))
+
+            constrainedItems = pinned + trimmedUnpinned
+
+            // Clean up pruned image files
+            let activeImagePaths = Set(constrainedItems.compactMap { $0.imagePath })
+            let discardedImagePaths = items.compactMap { $0.imagePath }.filter { !activeImagePaths.contains($0) }
+            for img in discardedImagePaths {
+                deleteImage(filename: img)
+            }
         }
 
         do {
@@ -131,6 +147,7 @@ public final class ClipboardStore: @unchecked Sendable {
 
     /// Saves image data and returns relative image filename.
     public func saveImage(data: Data, id: UUID) -> String? {
+        createDirectoriesIfNeeded()
         let filename = "\(id.uuidString).png"
         let fileURL = imagesDirectoryURL.appendingPathComponent(filename)
         do {
@@ -148,9 +165,34 @@ public final class ClipboardStore: @unchecked Sendable {
         return NSImage(contentsOf: fileURL)
     }
 
+    /// Deletes a specific image file from local disk.
+    public func deleteImage(filename: String) {
+        let fileURL = imagesDirectoryURL.appendingPathComponent(filename)
+        try? fileManager.removeItem(at: fileURL)
+    }
+
+    /// Cleans up orphaned image files that are no longer referenced by any active item.
+    public func cleanOrphanedImages(activeItems: [ClipboardItem]) {
+        queue.async { [weak self] in
+            guard let self = self else { return }
+            let referencedFilenames = Set(activeItems.compactMap { $0.imagePath })
+
+            guard let files = try? self.fileManager.contentsOfDirectory(atPath: self.imagesDirectoryURL.path) else {
+                return
+            }
+
+            for file in files where file.hasSuffix(".png") {
+                if !referencedFilenames.contains(file) {
+                    let fileURL = self.imagesDirectoryURL.appendingPathComponent(file)
+                    try? self.fileManager.removeItem(at: fileURL)
+                }
+            }
+        }
+    }
+
     /// Clears all stored items and image files.
     public func clearAll() {
-        queue.async { [weak self] in
+        queue.sync { [weak self] in
             guard let self = self else { return }
             try? self.fileManager.removeItem(at: self.historyFileURL)
             try? self.fileManager.removeItem(at: self.imagesDirectoryURL)

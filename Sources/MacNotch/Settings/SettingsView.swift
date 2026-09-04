@@ -94,6 +94,12 @@ public struct SettingsView: View {
                     }
                 }
 
+                Picker("Duplicate Behavior", selection: $settings.duplicatePolicy) {
+                    ForEach(ClipboardDuplicatePolicy.allCases) { policy in
+                        Text(policy.rawValue).tag(policy.rawValue)
+                    }
+                }
+
                 Toggle("Filter Sensitive Passwords & API Keys", isOn: $settings.filterSensitive)
             }
 

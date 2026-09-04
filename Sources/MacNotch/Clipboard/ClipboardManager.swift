@@ -2,18 +2,23 @@ import AppKit
 import Combine
 import Foundation
 
-/// Monitors the macOS system pasteboard, creates categorized history items,
-/// enforces retention/privacy policies, and allows copying items back to the pasteboard.
+/// Monitors the macOS system pasteboard, manages categorized history,
+/// enforces search/filtering/pinning, and coordinates persistence.
 @MainActor
 public final class ClipboardManager: ObservableObject {
     @Published public private(set) var items: [ClipboardItem] = []
+    @Published public var selectedCategory: ClipboardCategory = .all
+    @Published public var searchQuery: String = ""
     @Published public var isPaused: Bool = false
     @Published public var filterSensitiveData: Bool = true
     @Published public var retentionLimit: RetentionLimit = .hundred
     @Published public var autoDeletePeriod: AutoDeletePeriod = .never
+    @Published public var duplicatePolicy: ClipboardDuplicatePolicy = .moveToTop
 
     private let pasteboard = NSPasteboard.general
     private let store: ClipboardStore
+    private let searchEngine = ClipboardSearchEngine.shared
+    private let previewProvider = ClipboardPreviewProvider.shared
     private var lastChangeCount: Int = 0
     private var timer: Timer?
 
@@ -42,7 +47,13 @@ public final class ClipboardManager: ObservableObject {
         timer = nil
     }
 
-    /// Checks if the pasteboard changeCount changed, and processes new entries.
+    /// Filtered and sorted items according to the active category and search query.
+    public var filteredItems: [ClipboardItem] {
+        searchEngine.search(items: items, category: selectedCategory, query: searchQuery)
+    }
+
+    // MARK: - Change Detection
+
     public func checkForChanges() {
         guard !isPaused else { return }
 
@@ -50,7 +61,7 @@ public final class ClipboardManager: ObservableObject {
         guard currentChangeCount != lastChangeCount else { return }
         lastChangeCount = currentChangeCount
 
-        // Check for password manager transient types (e.g. 1Password, Bitwarden, Keychain)
+        // 1. Password manager transient types (1Password, Bitwarden, Keychain)
         if let types = pasteboard.types {
             let transientTypeNames = [
                 "org.nspasteboard.TransientType",
@@ -60,59 +71,68 @@ public final class ClipboardManager: ObservableObject {
             ]
             for transient in transientTypeNames {
                 if types.contains(where: { $0.rawValue.contains(transient) }) {
-                    return // Ignore password manager transient copies
+                    return
                 }
             }
         }
 
-        // Process images first
+        // 2. Process images
         if let image = NSImage(pasteboard: pasteboard),
            let tiffData = image.tiffRepresentation,
            let bitmap = NSBitmapImageRep(data: tiffData),
            let pngData = bitmap.representation(using: .png, properties: [:]) {
             let id = UUID()
             let imagePath = store.saveImage(data: pngData, id: id)
+            let dims = CGSize(width: image.size.width, height: image.size.height)
             let item = ClipboardItem(
                 id: id,
                 timestamp: Date(),
                 type: .image,
-                preview: "Image (\(Int(image.size.width)) × \(Int(image.size.height)))",
-                imagePath: imagePath
+                preview: "Image (\(Int(dims.width)) × \(Int(dims.height)))",
+                imagePath: imagePath,
+                imageDimensions: dims
             )
             add(item: item)
             return
         }
 
-        // Process file URLs
+        // 3. Process file URLs
         if let fileURLs = pasteboard.readObjects(forClasses: [NSURL.self], options: [
             NSPasteboard.ReadingOptionKey.urlReadingFileURLsOnly: true
         ]) as? [URL], let firstURL = fileURLs.first {
             let filename = firstURL.lastPathComponent
+            var fileSize: Int64?
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: firstURL.path),
+               let size = attrs[.size] as? Int64 {
+                fileSize = size
+            }
+
+            let preview = filename
             let item = ClipboardItem(
                 id: UUID(),
                 timestamp: Date(),
                 type: .file,
-                preview: filename,
-                fileURLString: firstURL.absoluteString
+                preview: preview,
+                fileURLString: firstURL.absoluteString,
+                fileSize: fileSize
             )
             add(item: item)
             return
         }
 
-        // Process string content
+        // 4. Process string content
         guard let string = pasteboard.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
               !string.isEmpty else {
             return
         }
 
-        // Sensitive data heuristic check
         let isSensitive = detectSensitiveContent(string)
         if isSensitive && filterSensitiveData {
-            return // Skip sensitive credentials if filtering is enabled
+            return
         }
 
         let contentType = classify(string: string)
-        let preview = makePreview(for: string, type: contentType)
+        let preview = previewProvider.generatePreview(for: string, type: contentType)
 
         let item = ClipboardItem(
             id: UUID(),
@@ -127,31 +147,102 @@ public final class ClipboardManager: ObservableObject {
         add(item: item)
     }
 
-    /// Adds a new item to history while preventing consecutive duplicates.
+    // MARK: - Item Management & Deduplication
+
     public func add(item: ClipboardItem) {
-        // Prevent consecutive duplicates
-        if let first = items.first {
-            if first.type == item.type {
-                if let text1 = first.textContent, let text2 = item.textContent, text1 == text2 {
-                    return
-                }
-                if let file1 = first.fileURLString, let file2 = item.fileURLString, file1 == file2 {
-                    return
-                }
+        // Consecutive duplicate check
+        if let first = items.first, isContentEqual(first, item) {
+            return
+        }
+
+        // Non-consecutive duplicate check based on policy
+        if duplicatePolicy == .moveToTop {
+            if let existingIndex = items.firstIndex(where: { isContentEqual($0, item) }) {
+                let existing = items.remove(at: existingIndex)
+                let updated = ClipboardItem(
+                    id: existing.id,
+                    timestamp: Date(),
+                    type: existing.type,
+                    preview: existing.preview,
+                    textContent: existing.textContent,
+                    imagePath: existing.imagePath,
+                    fileURLString: existing.fileURLString,
+                    isSensitive: existing.isSensitive,
+                    characterCount: existing.characterCount,
+                    isPinned: existing.isPinned,
+                    fileSize: existing.fileSize,
+                    imageDimensions: existing.imageDimensions
+                )
+                insertSorted(item: updated)
+                store.saveHistory(items, limit: retentionLimit)
+                return
             }
         }
 
-        items.insert(item, at: 0)
+        insertSorted(item: item)
 
-        // Enforce limit
-        if retentionLimit != .unlimited && items.count > retentionLimit.rawValue {
-            items = Array(items.prefix(retentionLimit.rawValue))
+        // Enforce retention limit (pinned items protected)
+        if retentionLimit != .unlimited {
+            let maxTotal = retentionLimit.rawValue
+            let pinned = items.filter { $0.isPinned }
+            let unpinned = items.filter { !$0.isPinned }
+            let remainingSlots = max(0, maxTotal - pinned.count)
+            items = pinned + Array(unpinned.prefix(remainingSlots))
         }
 
         store.saveHistory(items, limit: retentionLimit)
     }
 
-    /// Copies a clipboard item back to the macOS pasteboard.
+    private func insertSorted(item: ClipboardItem) {
+        if item.isPinned {
+            // Pinned items stay at the very top
+            items.insert(item, at: 0)
+        } else {
+            // Place after existing pinned items
+            let firstUnpinnedIndex = items.firstIndex(where: { !$0.isPinned }) ?? items.count
+            items.insert(item, at: firstUnpinnedIndex)
+        }
+    }
+
+    private func isContentEqual(_ a: ClipboardItem, _ b: ClipboardItem) -> Bool {
+        guard a.type == b.type else { return false }
+        if let t1 = a.textContent, let t2 = b.textContent {
+            return t1 == t2
+        }
+        if let f1 = a.fileURLString, let f2 = b.fileURLString {
+            return f1 == f2
+        }
+        if let i1 = a.imagePath, let i2 = b.imagePath {
+            return i1 == i2
+        }
+        return false
+    }
+
+    // MARK: - Pinning Actions
+
+    public func togglePin(item: ClipboardItem) {
+        guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
+        var updated = items.remove(at: index)
+        updated.isPinned.toggle()
+
+        insertSorted(item: updated)
+        store.saveHistory(items, limit: retentionLimit)
+    }
+
+    public func pin(item: ClipboardItem) {
+        if !item.isPinned {
+            togglePin(item: item)
+        }
+    }
+
+    public func unpin(item: ClipboardItem) {
+        if item.isPinned {
+            togglePin(item: item)
+        }
+    }
+
+    // MARK: - Pasteboard Write
+
     public func copyToPasteboard(_ item: ClipboardItem) {
         pasteboard.clearContents()
 
@@ -170,18 +261,35 @@ public final class ClipboardManager: ObservableObject {
             }
         }
 
-        // Update change count so our own write doesn't get re-imported
         lastChangeCount = pasteboard.changeCount
     }
 
-    /// Removes a specific item from history.
+    public func copyPlainTextToPasteboard(_ item: ClipboardItem) {
+        if let text = item.textContent ?? item.fileURLString {
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
+            lastChangeCount = pasteboard.changeCount
+        }
+    }
+
+    // MARK: - Deletion
+
     public func remove(item: ClipboardItem) {
+        if let path = item.imagePath {
+            store.deleteImage(filename: path)
+        }
         items.removeAll { $0.id == item.id }
         store.saveHistory(items, limit: retentionLimit)
     }
 
-    /// Clears the entire clipboard history.
     public func clearHistory() {
+        // Clear unpinned items only, or all if none pinned
+        items.removeAll { !$0.isPinned }
+        store.saveHistory(items, limit: retentionLimit)
+        store.cleanOrphanedImages(activeItems: items)
+    }
+
+    public func clearAllIncludingPinned() {
         items.removeAll()
         store.clearAll()
     }
@@ -189,18 +297,19 @@ public final class ClipboardManager: ObservableObject {
     // MARK: - Classification & Heuristics
 
     public func classify(string: String) -> ClipboardContentType {
-        if let url = URL(string: string), url.scheme != nil, ["http", "https", "ftp"].contains(url.scheme?.lowercased()) {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = URL(string: trimmed), url.scheme != nil, ["http", "https", "ftp"].contains(url.scheme?.lowercased()) {
             return .url
         }
 
-        if isLikelyCode(string) {
+        if isLikelyCode(trimmed) {
             return .code
         }
 
         return .text
     }
 
-    private func isLikelyCode(_ string: String) -> Bool {
+    public func isLikelyCode(_ string: String) -> Bool {
         let codeIndicators = [
             "func ", "import ", "const ", "let ", "var ", "class ", "struct ",
             "enum ", "def ", "return ", "public ", "private ", "interface ",
@@ -217,37 +326,36 @@ public final class ClipboardManager: ObservableObject {
             }
         }
 
-        // Check for indentation or braces formatting
-        if string.contains("{\n") || string.contains("    ") || string.contains("\t") {
-            if string.count > 20 && (string.contains("(") && string.contains(")")) {
-                return true
-            }
+        if (string.contains("{\n") || string.contains("    ") || string.contains("\t")) &&
+            string.count > 20 && string.contains("(") && string.contains(")") {
+            return true
         }
 
         return false
     }
 
+    /// Robust sensitive credential detection avoiding false positives on ordinary source code.
     public func detectSensitiveContent(_ string: String) -> Bool {
-        let lower = string.lowercased()
-        if lower.hasPrefix("sk-") || lower.hasPrefix("ghp_") || lower.hasPrefix("glpat-") {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // API Keys and Tokens
+        if trimmed.hasPrefix("sk-proj-") || trimmed.hasPrefix("sk-ant-") ||
+           trimmed.hasPrefix("ghp_") || trimmed.hasPrefix("gho_") ||
+           trimmed.hasPrefix("glpat-") {
             return true
         }
-        if string.contains("-----BEGIN") && string.contains("PRIVATE KEY-----") {
+
+        // Private Keys
+        if trimmed.contains("-----BEGIN") && trimmed.contains("PRIVATE KEY-----") {
             return true
         }
-        if lower.contains("bearer ") || lower.contains("authorization: ") {
+
+        // Long Bearer tokens (must have actual base64/hex token of length >= 20)
+        let lower = trimmed.lowercased()
+        if lower.hasPrefix("bearer ") && trimmed.count >= 28 {
             return true
         }
+
         return false
-    }
-
-    private func makePreview(for string: String, type: ClipboardContentType) -> String {
-        let lines = string.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        let singleLine = lines.prefix(2).joined(separator: " ").trimmingCharacters(in: .whitespaces)
-
-        if singleLine.count > 120 {
-            return String(singleLine.prefix(120)) + "…"
-        }
-        return singleLine
     }
 }
