@@ -8,7 +8,7 @@ final class SettingsStoreTests: XCTestCase {
         settings.resetToDefaults()
 
         XCTAssertTrue(settings.enableNotch)
-        XCTAssertEqual(settings.hoverDelay, 0.28, accuracy: 0.01)
+        XCTAssertEqual(settings.hoverDelay, 0.12, accuracy: 0.01)
         XCTAssertEqual(settings.collapseDelay, 0.35, accuracy: 0.01)
         XCTAssertEqual(settings.clipboardRetention, 100)
         XCTAssertEqual(settings.clipboardAutoDelete, AutoDeletePeriod.never.rawValue)

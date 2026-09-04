@@ -114,14 +114,9 @@ public struct NotchGeometry: Equatable, Sendable {
         let expandedY = anchorTopY - responsiveHeight
         let expandedRect = CGRect(x: expandedX, y: expandedY, width: responsiveWidth, height: responsiveHeight)
 
-        // Activation hover rect: covers the physical camera area plus the collapsed chin + safety margin
-        let activationExtraPadding: CGFloat = 12
-        let activationX = cameraRect.midX - (cameraRect.width / 2 + 16)
-        let activationWidth = cameraRect.width + 32
-        let activationMinY = collapsedY - activationExtraPadding
-        let activationMaxY = screenFrame.maxY
-        let activationHeight = activationMaxY - activationMinY
-        let activationRect = CGRect(x: activationX, y: activationMinY, width: activationWidth, height: activationHeight)
+        // Activation hover rect: strictly constrained to the physical camera housing bounds.
+        // It NEVER extends into the menu bar to the left/right or into windows below the camera.
+        let activationRect = cameraRect
 
         return NotchGeometry(
             screenFrame: screenFrame,

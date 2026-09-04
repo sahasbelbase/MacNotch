@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Minimal collapsed state that visually integrates with the physical camera housing
-/// as a sleek hardware chin extending below the notch.
+/// Minimal collapsed state that remains completely invisible/clear when idle,
+/// displaying an accent pill only while actively hovering inside the camera notch.
 public struct CollapsedNotchView: View {
     @ObservedObject var appState: AppState
 
@@ -11,22 +11,17 @@ public struct CollapsedNotchView: View {
 
     public var body: some View {
         ZStack {
-            // Hardware-matched chin with continuous bottom rounded corners
-            NotchShape(cornerRadius: 6)
-                .fill(Color.black)
-                .overlay(
-                    NotchShape(cornerRadius: 6)
-                        .stroke(DesignSystem.Colors.subtleBorder.opacity(0.4), lineWidth: 0.5)
-                )
-
-            // Subtle indicator when mouse enters activation zone
+            // When collapsed, do NOT draw any dark background or shape on the screen.
+            // Only show a responsive accent indicator when actively hovering inside the camera notch.
             if appState.currentState == .activating {
                 Capsule()
-                    .fill(Color.accentColor.opacity(0.9))
-                    .frame(width: 28, height: 2.5)
+                    .fill(Color.accentColor.opacity(0.95))
+                    .frame(width: 32, height: 3)
+                    .shadow(color: Color.accentColor.opacity(0.6), radius: 6, x: 0, y: 1)
                     .transition(.opacity.combined(with: .scale))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.clear)
     }
 }

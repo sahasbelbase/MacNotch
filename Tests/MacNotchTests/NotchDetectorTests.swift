@@ -33,10 +33,11 @@ final class NotchDetectorTests: XCTestCase {
         XCTAssertEqual(expanded.midX, notchRect.midX)
         XCTAssertGreaterThan(expanded.width, 600, "Expanded width must be wide and spacious")
 
-        // Activation Rect covers camera housing (1131..1169) plus collapsed chin
+        // Activation Rect strictly matches camera housing (1131..1169) so it never triggers outside
         let activation = geometry.activationRect()
         XCTAssertEqual(activation.maxY, 1169, "Activation zone extends up to top of screen")
-        XCTAssertLessThan(activation.minY, collapsed.minY, "Activation zone extends down past collapsed chin")
+        XCTAssertEqual(activation.minY, 1131, "Activation zone strictly starts at bottom of camera, never below")
+        XCTAssertEqual(activation.width, notchRect.width, "Activation width strictly matches camera housing")
     }
 
     func testNotchDetectionOnCurrentDevice() {

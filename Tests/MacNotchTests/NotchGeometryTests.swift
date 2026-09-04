@@ -41,9 +41,8 @@ final class NotchGeometryTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(geo.expandedRect.width, 680)
         XCTAssertLessThanOrEqual(geo.expandedRect.width, 840)
 
-        // Activation Rect covers hardware camera and collapsed panel
-        XCTAssertEqual(geo.activationRect.maxY, frame.maxY)
-        XCTAssertLessThan(geo.activationRect.minY, geo.collapsedRect.minY)
+        // Activation Rect is strictly constrained to hardware camera bounds
+        XCTAssertEqual(geo.activationRect, cameraRect)
     }
 
     func testResponsiveWidthOn16InchScreen() {

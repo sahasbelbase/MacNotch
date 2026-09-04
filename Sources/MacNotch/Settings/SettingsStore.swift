@@ -8,7 +8,7 @@ public final class SettingsStore: ObservableObject {
 
     // MARK: - General Settings
     @AppStorage("enableNotch") public var enableNotch: Bool = true
-    @AppStorage("hoverDelay") public var hoverDelay: Double = 0.28
+    @AppStorage("hoverDelay") public var hoverDelay: Double = 0.12
     @AppStorage("collapseDelay") public var collapseDelay: Double = 0.35
     @AppStorage("launchAtLogin") public var launchAtLogin: Bool = false {
         didSet {
@@ -58,7 +58,7 @@ public final class SettingsStore: ObservableObject {
     /// Resets all settings to default values.
     public func resetToDefaults() {
         enableNotch = true
-        hoverDelay = 0.28
+        hoverDelay = 0.12
         collapseDelay = 0.35
         launchAtLogin = false
         clipboardRetention = 100

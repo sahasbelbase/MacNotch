@@ -60,7 +60,7 @@ public struct SettingsView: View {
                         Text("\(Int(settings.hoverDelay * 1000)) ms")
                             .foregroundColor(.secondary)
                     }
-                    Slider(value: $settings.hoverDelay, in: 0.15...0.60, step: 0.05)
+                    Slider(value: $settings.hoverDelay, in: 0.05...0.40, step: 0.02)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {

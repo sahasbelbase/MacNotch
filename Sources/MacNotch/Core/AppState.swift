@@ -54,7 +54,7 @@ public final class AppState: ObservableObject {
     }
 
     // Configurable delays (in seconds)
-    @Published public var hoverActivationDelay: Double = 0.28
+    @Published public var hoverActivationDelay: Double = 0.12
     @Published public var collapseDelay: Double = 0.35
 
     private var activationTask: Task<Void, Never>?

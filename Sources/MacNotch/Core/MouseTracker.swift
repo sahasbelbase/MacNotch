@@ -47,9 +47,8 @@ public final class MouseTracker: ObservableObject {
             return event
         }
 
-        // Fallback periodic timer (runs at low frequency only when in transitioning/expanded states
-        // to catch cursor teleportation or rapid gestures that may bypass event monitors)
-        fallbackTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        // Fallback periodic timer (runs at 50ms interval to catch rapid gestures)
+        fallbackTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.handleMouseMoved(screenLocation: NSEvent.mouseLocation)
             }
