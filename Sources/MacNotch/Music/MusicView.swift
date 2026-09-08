@@ -59,31 +59,8 @@ public struct MusicView: View {
     // MARK: - Hero Card View (Used as Main Hero in Overview tab)
     private var heroCardView: some View {
         HStack(spacing: 14) {
-            // Album Art or Music Gradient Icon (54x54)
-            if let artwork = nowPlayingService.artwork {
-                Image(nsImage: artwork)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 52, height: 52)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
-            } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.pink.opacity(0.85), Color.purple.opacity(0.85)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    Image(systemName: nowPlayingService.isPlaying ? "waveform" : "music.note")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-                .frame(width: 52, height: 52)
-                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 1)
-            }
+            // Album Art or Music Gradient Icon (Click to open Music Studio)
+            coverArtButton(size: 52, cornerRadius: 10)
 
             // Track Details & Player Badge
             VStack(alignment: .leading, spacing: 3) {
@@ -95,13 +72,18 @@ public struct MusicView: View {
                         .truncationMode(.tail)
 
                     if let player = nowPlayingService.activePlayerName {
-                        Text(player)
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.accentColor)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Color.accentColor.opacity(0.15))
-                            .clipShape(Capsule())
+                        Button(action: { openMusicStudio() }) {
+                            Text(player)
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.accentColor)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Color.accentColor.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .pointingHandCursor()
+                        .help("Open \(player)")
                     }
 
                     if !nowPlayingService.musicStudioProvider.libraryTracks.isEmpty {
@@ -183,31 +165,8 @@ public struct MusicView: View {
     // MARK: - Horizontal Bar View (Used in Overview row - guaranteed zero text/icon overlap)
     private var horizontalBarView: some View {
         HStack(spacing: 12) {
-            // Left: Album Art or Music Gradient Icon
-            if let artwork = nowPlayingService.artwork {
-                Image(nsImage: artwork)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 38, height: 38)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 1)
-            } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.pink.opacity(0.8), Color.purple.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    Image(systemName: "music.note")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-                .frame(width: 38, height: 38)
-                .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
-            }
+            // Left: Album Art (Click to open Music Studio)
+            coverArtButton(size: 38, cornerRadius: 8)
 
             // Center: Track Title & Artist (with tail truncation and layoutPriority(0))
             VStack(alignment: .leading, spacing: 2) {
@@ -278,31 +237,8 @@ public struct MusicView: View {
     // MARK: - Full Tab View (Expanded dedicated Music tab)
     private var fullTabView: some View {
         VStack(spacing: 16) {
-            // Large Album Art
-            if let artwork = nowPlayingService.artwork {
-                Image(nsImage: artwork)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 90, height: 90)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
-            } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.pink.opacity(0.8), Color.purple.opacity(0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    Image(systemName: "music.note")
-                        .font(.system(size: 36, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-                .frame(width: 90, height: 90)
-                .shadow(color: .black.opacity(0.2), radius: 6, x: 0, y: 3)
-            }
+            // Large Album Art (Click to open Music Studio)
+            coverArtButton(size: 90, cornerRadius: 14)
 
             // Track details
             VStack(spacing: 4) {
@@ -357,5 +293,60 @@ public struct MusicView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Interactive Cover Art Button
+    @ViewBuilder
+    private func coverArtButton(size: CGFloat, cornerRadius: CGFloat) -> some View {
+        Button(action: {
+            openMusicStudio()
+        }) {
+            ZStack {
+                if let artwork = nowPlayingService.artwork {
+                    Image(nsImage: artwork)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: size, height: size)
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                } else {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.pink.opacity(0.85), Color.purple.opacity(0.85)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: size, height: size)
+
+                    Image(systemName: nowPlayingService.isPlaying ? "waveform" : "music.note")
+                        .font(.system(size: size * 0.4, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+            }
+            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .pointingHandCursor()
+        .help("Click cover artwork to open Music Studio")
+    }
+
+    /// Brings Music Studio to foreground or launches it if closed.
+    private func openMusicStudio() {
+        let appURL = URL(fileURLWithPath: "/Applications/Music Studio.app")
+        if FileManager.default.fileExists(atPath: appURL.path) {
+            let config = NSWorkspace.OpenConfiguration()
+            config.activates = true // Bring to front
+            NSWorkspace.shared.openApplication(at: appURL, configuration: config, completionHandler: nil)
+        } else {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            proc.arguments = ["-a", "Music Studio"]
+            try? proc.run()
+        }
     }
 }

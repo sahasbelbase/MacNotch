@@ -24,6 +24,17 @@ extension View {
                     .stroke(isSelected ? DesignSystem.Colors.activeBorder : DesignSystem.Colors.subtleBorder, lineWidth: 1)
             )
     }
+
+    /// Changes cursor to pointing hand on mouse hover.
+    public func pointingHandCursor() -> some View {
+        self.onHover { inside in
+            if inside {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+    }
 }
 
 extension NSRect {

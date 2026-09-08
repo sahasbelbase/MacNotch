@@ -104,8 +104,9 @@ public struct ExpandedNotchView: View {
     // MARK: - Header Bar (Left Ear / Notch Cutout / Right Ear Flanking Layout)
     private var topHeaderBar: some View {
         HStack(alignment: .center, spacing: 0) {
-            // Left Ear: Overview & Clipboard (flanking left of the physical camera notch)
-            HStack(spacing: 5) {
+            // Left Ear: MacNotch Icon, Overview & Clipboard (flanking left of the physical camera notch)
+            HStack(spacing: 6) {
+                macNotchBrandBadge
                 tabButton(for: .overview)
                 tabButton(for: .clipboard)
             }
@@ -130,6 +131,33 @@ public struct ExpandedNotchView: View {
         }
         .padding(.horizontal, 6)
         .padding(.top, 2)
+    }
+
+    private var macNotchBrandBadge: some View {
+        Button(action: {
+            withAnimation(DesignSystem.Animation.tabSwitch) {
+                appState.selectedTab = .overview
+            }
+        }) {
+            Group {
+                if let appIcon = NSImage(named: "AppIcon") ?? NSApplication.shared.applicationIconImage {
+                    Image(nsImage: appIcon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 20, height: 20)
+                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                } else {
+                    Image(systemName: "menubar.arrow.up.rectangle")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.accentColor)
+                        .frame(width: 20, height: 20)
+                }
+            }
+            .shadow(color: Color.accentColor.opacity(0.35), radius: 3, x: 0, y: 1)
+        }
+        .buttonStyle(.plain)
+        .pointingHandCursor()
+        .help("MacNotch Overview (⌘1)")
     }
 
     @ViewBuilder
