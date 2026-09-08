@@ -203,10 +203,34 @@ public struct MusicStudioListView: View {
                     .buttonStyle(.plain)
                     .help("Shuffle play local library")
                 } else {
-                    if isSearchingOnline {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                            .frame(width: 14, height: 14)
+                    HStack(spacing: 6) {
+                        if isSearchingOnline {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                                .frame(width: 14, height: 14)
+                        }
+
+                        if !onlineTracks.isEmpty {
+                            Button(action: {
+                                if let randomTrack = onlineTracks.randomElement() {
+                                    musicStudioProvider.streamTrack(randomTrack)
+                                }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "shuffle")
+                                        .font(.system(size: 9, weight: .semibold))
+                                    Text("Shuffle Stream")
+                                        .font(.system(size: 10, weight: .medium))
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3.5)
+                                .background(Color.white.opacity(0.08))
+                                .clipShape(Capsule())
+                                .foregroundColor(DesignSystem.Colors.textPrimary)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Shuffle play online stream tracks")
+                        }
                     }
                 }
             }
