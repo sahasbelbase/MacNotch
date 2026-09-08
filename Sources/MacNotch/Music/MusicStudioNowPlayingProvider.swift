@@ -72,6 +72,7 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
     private var sseTask: Task<Void, Never>?
     private var lastCoverURL: String?
     private let session: URLSession
+    private let imageCache = NSCache<NSURL, NSImage>()
 
     public init() {
         let config = URLSessionConfiguration.default
@@ -214,9 +215,15 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         // 1. Direct remote URL (from streaming services Deezer/iTunes)
         if coverURL.hasPrefix("http://") || coverURL.hasPrefix("https://") {
             guard let url = URL(string: coverURL) else { return }
+            if let cached = imageCache.object(forKey: url as NSURL) {
+                self.artwork = cached
+                self.onUpdate?()
+                return
+            }
             Task {
                 if let (data, _) = try? await session.data(from: url), let img = NSImage(data: data) {
                     await MainActor.run {
+                        self.imageCache.setObject(img, forKey: url as NSURL)
                         self.artwork = img
                         self.onUpdate?()
                     }
@@ -246,10 +253,16 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         let path = coverURL.hasPrefix("/") ? coverURL : "/\(coverURL)"
         let fullURLStr = "\(baseURL)\(path)"
         guard let url = URL(string: fullURLStr) else { return }
+        if let cached = imageCache.object(forKey: url as NSURL) {
+            self.artwork = cached
+            self.onUpdate?()
+            return
+        }
 
         Task {
             if let (data, _) = try? await session.data(from: url), let img = NSImage(data: data) {
                 await MainActor.run {
+                    self.imageCache.setObject(img, forKey: url as NSURL)
                     self.artwork = img
                     self.onUpdate?()
                 }
@@ -616,6 +629,33 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
             }
         }
         self.onUpdate?()
+    }
+
+    public func seek(to seconds: Double) {
+        self.currentTime = seconds
+        sendAction("seek", additionalFields: ["time": seconds])
+        self.onUpdate?()
+    }
+
+    /// Brings the running Music Studio window to the foreground or launches the app if not running.
+    public func bringMusicStudioToFront() {
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: "com.musicstudio.app")
+        if let app = running.first {
+            app.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+            return
+        }
+
+        let appURL = URL(fileURLWithPath: "/Applications/Music Studio.app")
+        if FileManager.default.fileExists(atPath: appURL.path) {
+            let config = NSWorkspace.OpenConfiguration()
+            config.activates = true
+            NSWorkspace.shared.openApplication(at: appURL, configuration: config, completionHandler: nil)
+        } else {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            proc.arguments = ["-a", "Music Studio"]
+            try? proc.run()
+        }
     }
 
     // MARK: - Process Lifecycle & Background Auto-Launch

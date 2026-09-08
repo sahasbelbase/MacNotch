@@ -337,16 +337,6 @@ public struct MusicView: View {
 
     /// Brings Music Studio to foreground or launches it if closed.
     private func openMusicStudio() {
-        let appURL = URL(fileURLWithPath: "/Applications/Music Studio.app")
-        if FileManager.default.fileExists(atPath: appURL.path) {
-            let config = NSWorkspace.OpenConfiguration()
-            config.activates = true // Bring to front
-            NSWorkspace.shared.openApplication(at: appURL, configuration: config, completionHandler: nil)
-        } else {
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            proc.arguments = ["-a", "Music Studio"]
-            try? proc.run()
-        }
+        nowPlayingService.musicStudioProvider.bringMusicStudioToFront()
     }
 }
