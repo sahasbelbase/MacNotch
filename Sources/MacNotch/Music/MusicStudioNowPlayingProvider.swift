@@ -362,7 +362,7 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
             fetchCoverArtwork(coverURL: "/api/songs/artwork/\(encoded)")
         }
 
-        // Dispatch play_track command to Music Studio engine
+        // Dispatch play_track command to Music Studio engine (auto-launching app if closed)
         sendAction("play_track", additionalFields: [
             "filename": track.filename,
             "title": track.title
@@ -373,7 +373,21 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
 
     public func play() {
         self.isPlaying = true
-        sendAction("play")
+        self.isAvailable = true
+
+        if let current = currentTrack,
+           let matched = libraryTracks.first(where: {
+               $0.title.lowercased() == current.title.lowercased() ||
+               $0.filename.lowercased() == current.title.lowercased() + ".mp3"
+           }) {
+            playTrack(matched)
+            return
+        } else if let first = libraryTracks.first {
+            playTrack(first)
+            return
+        } else {
+            sendAction("play")
+        }
         self.onUpdate?()
     }
 
@@ -384,9 +398,11 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
     }
 
     public func togglePlayPause() {
-        self.isPlaying.toggle()
-        sendAction("toggle")
-        self.onUpdate?()
+        if isPlaying {
+            pause()
+        } else {
+            play()
+        }
     }
 
     public func next() {
@@ -435,7 +451,163 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         self.onUpdate?()
     }
 
+    // MARK: - Process Lifecycle & Background Auto-Launch
+
+    /// Checks whether Music Studio is running and responding; if closed, launches it in the background
+    /// and waits until the local API server on port 5050 is online before dispatching playback actions.
+    public func ensureMusicStudioRunning(completion: @escaping (Bool) -> Void) {
+        let isAppRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: "com.musicstudio.app").isEmpty
+
+        if isAppRunning {
+            pingServer { [weak self] isResponding in
+                if isResponding {
+                    completion(true)
+                } else {
+                    self?.waitForServerToComeOnline(maxAttempts: 25, delayMs: 200, completion: completion)
+                }
+            }
+        } else {
+            // App is not running (e.g. was quit or force quit). Launch silently in background.
+            launchMusicStudioInBackground { [weak self] launched in
+                guard launched else {
+                    completion(false)
+                    return
+                }
+
+                self?.waitForServerToComeOnline(maxAttempts: 35, delayMs: 200) { online in
+                    if online {
+                        self?.startEventListener()
+                        self?.fetchLibrary()
+                        // Brief pause to allow WebKit to finish loading HTML/JS and establish SSE connection
+                        Task { @MainActor in
+                            try? await Task.sleep(nanoseconds: 600_000_000)
+                            completion(true)
+                        }
+                    } else {
+                        completion(false)
+                    }
+                }
+            }
+        }
+    }
+
+    private func pingServer(completion: @escaping (Bool) -> Void) {
+        guard let url = URL(string: "\(baseURL)/api/playback") else {
+            completion(false)
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 0.8
+
+        Task {
+            do {
+                let (_, response) = try await session.data(for: request)
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    await MainActor.run { completion(true) }
+                    return
+                }
+            } catch {
+                // Server offline
+            }
+            await MainActor.run { completion(false) }
+        }
+    }
+
+    private func launchMusicStudioInBackground(completion: @escaping (Bool) -> Void) {
+        let appURL = URL(fileURLWithPath: "/Applications/Music Studio.app")
+        guard FileManager.default.fileExists(atPath: appURL.path) else {
+            completion(false)
+            return
+        }
+
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = false // Launch in background without stealing focus
+        config.addsToRecentItems = false
+
+        NSWorkspace.shared.openApplication(at: appURL, configuration: config) { app, error in
+            Task { @MainActor in
+                if error == nil || app != nil {
+                    completion(true)
+                } else {
+                    // Fallback to command line open -g -a "Music Studio"
+                    let proc = Process()
+                    proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+                    proc.arguments = ["-g", "-a", "Music Studio"]
+                    try? proc.run()
+                    proc.waitUntilExit()
+                    completion(proc.terminationStatus == 0)
+                }
+            }
+        }
+    }
+
+    private func waitForServerToComeOnline(maxAttempts: Int, delayMs: UInt64, completion: @escaping (Bool) -> Void) {
+        Task {
+            for _ in 0..<maxAttempts {
+                if await checkServerRespondingAsync() {
+                    await MainActor.run {
+                        completion(true)
+                    }
+                    return
+                }
+                try? await Task.sleep(nanoseconds: delayMs * 1_000_000)
+            }
+            await MainActor.run {
+                completion(false)
+            }
+        }
+    }
+
+    private func checkServerRespondingAsync() async -> Bool {
+        guard let url = URL(string: "\(baseURL)/api/playback") else { return false }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 0.5
+        do {
+            let (_, response) = try await session.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                return true
+            }
+        } catch {
+            return false
+        }
+        return false
+    }
+
     private func sendAction(_ action: String, additionalFields: [String: Any]? = nil) {
+        ensureMusicStudioRunning { [weak self] ready in
+            guard let self = self, ready else { return }
+            self.dispatchActionPayloadWithRetry(action, additionalFields: additionalFields)
+        }
+    }
+
+    private func dispatchActionPayloadWithRetry(
+        _ action: String,
+        additionalFields: [String: Any]? = nil,
+        attemptsLeft: Int = 3
+    ) {
+        dispatchActionPayload(action, additionalFields: additionalFields)
+
+        // For play / play_track commands, verify playback begins.
+        // If Music Studio was just launched in the background, WebKit may take ~0.8-1.2s to connect its SSE stream.
+        if (action == "play" || action == "play_track") && attemptsLeft > 0 {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                guard let self = self else { return }
+                if !self.isPlaying {
+                    self.dispatchActionPayloadWithRetry(
+                        action,
+                        additionalFields: additionalFields,
+                        attemptsLeft: attemptsLeft - 1
+                    )
+                }
+            }
+        }
+    }
+
+    private func dispatchActionPayload(_ action: String, additionalFields: [String: Any]? = nil) {
         guard let url = URL(string: "\(baseURL)/api/playback/action") else { return }
 
         var payload: [String: Any] = ["action": action]
@@ -453,7 +625,7 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         Task {
             _ = try? await session.data(for: request)
             // Query fresh playback state shortly after dispatching action
-            try? await Task.sleep(nanoseconds: 150_000_000)
+            try? await Task.sleep(nanoseconds: 200_000_000)
             self.fetchPlaybackState()
         }
     }

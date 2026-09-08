@@ -139,4 +139,17 @@ final class NowPlayingProviderTests: XCTestCase {
         XCTAssertEqual(trackAction.title, "Play \"Test Song\"")
         XCTAssertEqual(trackAction.icon, "play.circle.fill")
     }
+
+    @MainActor
+    func testEnsureMusicStudioRunningWhenClosed() async {
+        let provider = MusicStudioNowPlayingProvider()
+        let exp = expectation(description: "Ensure Music Studio running completes")
+
+        provider.ensureMusicStudioRunning { ready in
+            XCTAssertTrue(ready, "Music Studio should launch in the background and respond on port 5050")
+            exp.fulfill()
+        }
+
+        await fulfillment(of: [exp], timeout: 15.0)
+    }
 }
