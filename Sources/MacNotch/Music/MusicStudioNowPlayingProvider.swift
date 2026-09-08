@@ -2,9 +2,9 @@ import AppKit
 import AVFoundation
 import Foundation
 
-/// Represents a song in the user's local "Music Studio" library.
+/// Represents a song in the user's local "Music Studio" library or an online stream.
 public struct MusicStudioTrack: Identifiable, Codable, Hashable, Sendable {
-    public var id: String { filename }
+    public var id: String { filename.isEmpty ? "\(artist)-\(title)" : filename }
     public let filename: String
     public let title: String
     public let artist: String
@@ -14,6 +14,12 @@ public struct MusicStudioTrack: Identifiable, Codable, Hashable, Sendable {
     public let duration: Double?
     public let size_mb: Double?
     public let bitrate: String?
+    public let cover_url: String?
+    public let query: String?
+
+    public var isStream: Bool {
+        filename.isEmpty || cover_url?.hasPrefix("http") == true || query != nil
+    }
 
     public init(
         filename: String,
@@ -24,7 +30,9 @@ public struct MusicStudioTrack: Identifiable, Codable, Hashable, Sendable {
         genre: String? = nil,
         duration: Double? = nil,
         size_mb: Double? = nil,
-        bitrate: String? = nil
+        bitrate: String? = nil,
+        cover_url: String? = nil,
+        query: String? = nil
     ) {
         self.filename = filename
         self.title = title
@@ -35,6 +43,8 @@ public struct MusicStudioTrack: Identifiable, Codable, Hashable, Sendable {
         self.duration = duration
         self.size_mb = size_mb
         self.bitrate = bitrate
+        self.cover_url = cover_url
+        self.query = query
     }
 }
 
@@ -149,7 +159,7 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
                 }
 
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    await self.processPlaybackJSON(json)
+                    self.processPlaybackJSON(json)
                 }
             } catch {
                 // Server temporarily unreachable
@@ -195,7 +205,27 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
     }
 
     private func fetchCoverArtwork(coverURL: String) {
-        // Check if artwork can be extracted locally from Music Studio library folder first
+        if coverURL.isEmpty || coverURL.contains("placeholder.svg") {
+            self.artwork = nil
+            self.onUpdate?()
+            return
+        }
+
+        // 1. Direct remote URL (from streaming services Deezer/iTunes)
+        if coverURL.hasPrefix("http://") || coverURL.hasPrefix("https://") {
+            guard let url = URL(string: coverURL) else { return }
+            Task {
+                if let (data, _) = try? await session.data(from: url), let img = NSImage(data: data) {
+                    await MainActor.run {
+                        self.artwork = img
+                        self.onUpdate?()
+                    }
+                }
+            }
+            return
+        }
+
+        // 2. Check if artwork can be extracted locally from Music Studio library folder
         let musicDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Music/Music Studio")
         if let current = currentTrack {
             let possibleFilenames = [
@@ -212,14 +242,9 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
             }
         }
 
-        let fullURLStr: String
-        if coverURL.hasPrefix("http://") || coverURL.hasPrefix("https://") {
-            fullURLStr = coverURL
-        } else {
-            let path = coverURL.hasPrefix("/") ? coverURL : "/\(coverURL)"
-            fullURLStr = "\(baseURL)\(path)"
-        }
-
+        // 3. Fallback to Music Studio local artwork API
+        let path = coverURL.hasPrefix("/") ? coverURL : "/\(coverURL)"
+        let fullURLStr = "\(baseURL)\(path)"
         guard let url = URL(string: fullURLStr) else { return }
 
         Task {
@@ -338,8 +363,13 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
 
     // MARK: - Playback Actions (Dispatched Exclusively to Music Studio)
 
-    /// Plays a specific track selected from the Music Studio library.
+    /// Plays a specific track selected from the Music Studio library or streams it online.
     public func playTrack(_ track: MusicStudioTrack) {
+        if track.isStream {
+            streamTrack(track)
+            return
+        }
+
         self.currentTrack = Track(
             title: track.title,
             artist: track.artist,
@@ -369,6 +399,100 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         ])
 
         self.onUpdate?()
+    }
+
+    /// Streams an online song on-the-fly via Music Studio audio engine.
+    public func streamTrack(_ track: MusicStudioTrack) {
+        self.currentTrack = Track(
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            duration: track.duration
+        )
+        self.isPlaying = true
+        self.isAvailable = true
+        self.currentTime = 0
+        self.duration = track.duration ?? 0
+
+        if let cover = track.cover_url, !cover.isEmpty {
+            self.lastCoverURL = cover
+            fetchCoverArtwork(coverURL: cover)
+        }
+
+        let payloadDict: [String: Any] = [
+            "title": track.title,
+            "artist": track.artist,
+            "album": track.album,
+            "duration": track.duration ?? 0,
+            "cover_url": track.cover_url ?? "",
+            "query": track.query ?? "\(track.artist) - \(track.title)"
+        ]
+
+        var jsonString = ""
+        if let data = try? JSONSerialization.data(withJSONObject: payloadDict),
+           let str = String(data: data, encoding: .utf8) {
+            jsonString = str
+        }
+
+        sendAction("stream_track", additionalFields: [
+            "title": track.title,
+            "filename": jsonString,
+            "query": track.query ?? "\(track.artist) - \(track.title)"
+        ])
+
+        self.onUpdate?()
+    }
+
+    // MARK: - Online Music Discovery & Search
+
+    /// Searches millions of songs online via Music Studio's explore API.
+    public func searchOnlineTracks(query: String) async -> [MusicStudioTrack] {
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty,
+              let encoded = clean.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "\(baseURL)/api/explore/search?q=\(encoded)&type=tracks") else {
+            return []
+        }
+
+        do {
+            let (data, response) = try await session.data(from: url)
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                return []
+            }
+
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return []
+            }
+
+            let rawTracks = (json["tracks"] as? [[String: Any]]) ?? (json["results"] as? [[String: Any]]) ?? []
+            return rawTracks.compactMap { dict in
+                guard let title = dict["title"] as? String, !title.isEmpty else { return nil }
+                let artist = (dict["artist"] as? String) ?? "Music Studio"
+                let album = (dict["album"] as? String) ?? "Online Stream"
+                let dur = (dict["duration"] as? Double) ?? Double((dict["duration"] as? Int) ?? 0)
+                let cover = (dict["cover_url"] as? String) ?? ""
+                let q = (dict["query"] as? String) ?? "\(artist) - \(title)"
+
+                return MusicStudioTrack(
+                    filename: "",
+                    title: title,
+                    artist: artist,
+                    album: album,
+                    duration: dur > 0 ? dur : nil,
+                    cover_url: cover,
+                    query: q
+                )
+            }
+        } catch {
+            return []
+        }
+    }
+
+    /// Fetches trending/popular hits online when no query is entered.
+    public func fetchTrendingTracks() async -> [MusicStudioTrack] {
+        let results = await searchOnlineTracks(query: "Top Hits 2026")
+        if !results.isEmpty { return results }
+        return await searchOnlineTracks(query: "Billboard Hits")
     }
 
     public func play() {
@@ -592,7 +716,7 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
 
         // For play / play_track commands, verify playback begins.
         // If Music Studio was just launched in the background, WebKit may take ~0.8-1.2s to connect its SSE stream.
-        if (action == "play" || action == "play_track") && attemptsLeft > 0 {
+        if (action == "play" || action == "play_track" || action == "stream_track") && attemptsLeft > 0 {
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 700_000_000)
                 guard let self = self else { return }

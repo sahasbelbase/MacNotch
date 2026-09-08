@@ -152,4 +152,46 @@ final class NowPlayingProviderTests: XCTestCase {
 
         await fulfillment(of: [exp], timeout: 15.0)
     }
+
+    @MainActor
+    func testOnlineStreamTrackModelAndStreaming() {
+        let streamTrack = MusicStudioTrack(
+            filename: "",
+            title: "Viva La Vida",
+            artist: "Coldplay",
+            album: "Viva La Vida",
+            duration: 242.0,
+            cover_url: "https://example.com/art.jpg",
+            query: "Coldplay - Viva La Vida Official Audio"
+        )
+
+        XCTAssertTrue(streamTrack.isStream)
+        XCTAssertEqual(streamTrack.id, "Coldplay-Viva La Vida")
+        XCTAssertEqual(streamTrack.title, "Viva La Vida")
+        XCTAssertEqual(streamTrack.artist, "Coldplay")
+        XCTAssertEqual(streamTrack.cover_url, "https://example.com/art.jpg")
+        XCTAssertEqual(streamTrack.query, "Coldplay - Viva La Vida Official Audio")
+
+        let provider = MusicStudioNowPlayingProvider()
+        provider.streamTrack(streamTrack)
+
+        XCTAssertTrue(provider.isPlaying)
+        XCTAssertEqual(provider.currentTrack?.title, "Viva La Vida")
+        XCTAssertEqual(provider.currentTrack?.artist, "Coldplay")
+        XCTAssertEqual(provider.currentTrack?.album, "Viva La Vida")
+        XCTAssertEqual(provider.duration, 242.0)
+    }
+
+    @MainActor
+    func testOnlineTrackSearchAPI() async {
+        let provider = MusicStudioNowPlayingProvider()
+        let results = await provider.searchOnlineTracks(query: "Coldplay")
+        // When Music Studio is running, search returns live Deezer results
+        if !results.isEmpty {
+            let first = results[0]
+            XCTAssertTrue(first.isStream)
+            XCTAssertFalse(first.title.isEmpty)
+            XCTAssertFalse(first.artist.isEmpty)
+        }
+    }
 }

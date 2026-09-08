@@ -1,14 +1,23 @@
 import SwiftUI
 
-/// Elegant, responsive track browser for the user's local "Music Studio" library.
-/// Supports search filtering, live playing indicator, track artwork, keyword function actions (play, pause, forward),
-/// and instant playback.
+/// Elegant, responsive track browser for the user's "Music Studio" library and online streaming catalog.
+/// Supports search filtering, live playing indicator, track artwork (both local ID3 and remote CDN),
+/// keyword function actions (play, pause, forward), and instant online audio streaming.
 public struct MusicStudioListView: View {
     @ObservedObject var musicStudioProvider: MusicStudioNowPlayingProvider
     @State private var searchText: String = ""
+    @State private var selectedTab: BrowserTab = .library
+    @State private var onlineTracks: [MusicStudioTrack] = []
+    @State private var isSearchingOnline: Bool = false
+    @State private var searchDebounceTask: Task<Void, Never>? = nil
 
     public init(musicStudioProvider: MusicStudioNowPlayingProvider) {
         self.musicStudioProvider = musicStudioProvider
+    }
+
+    public enum BrowserTab: String, CaseIterable {
+        case library = "Library"
+        case stream = "Stream Online"
     }
 
     public enum KeywordAction: Equatable {
@@ -79,7 +88,7 @@ public struct MusicStudioListView: View {
         }
     }
 
-    private var filteredTracks: [MusicStudioTrack] {
+    private var filteredLocalTracks: [MusicStudioTrack] {
         let tracks = musicStudioProvider.libraryTracks
         let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
         guard !query.isEmpty else {
@@ -101,66 +110,164 @@ public struct MusicStudioListView: View {
         }
     }
 
+    private func triggerOnlineSearch() {
+        searchDebounceTask?.cancel()
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        searchDebounceTask = Task {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            if Task.isCancelled { return }
+
+            await MainActor.run { isSearchingOnline = true }
+
+            let results: [MusicStudioTrack]
+            if query.isEmpty {
+                results = await musicStudioProvider.fetchTrendingTracks()
+            } else {
+                results = await musicStudioProvider.searchOnlineTracks(query: query)
+            }
+
+            if !Task.isCancelled {
+                await MainActor.run {
+                    self.onlineTracks = results
+                    self.isSearchingOnline = false
+                }
+            }
+        }
+    }
+
     public var body: some View {
         VStack(spacing: 6) {
-            // Search Bar & Track Count Header
-            HStack(spacing: 8) {
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(DesignSystem.Colors.textTertiary)
+            // Mode Selector & Quick Controls Bar
+            HStack(spacing: 6) {
+                // Tab Switcher Pills
+                HStack(spacing: 3) {
+                    Button(action: {
+                        selectedTab = .library
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "music.note.list")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text("Library (\(musicStudioProvider.libraryTracks.count))")
+                                .font(.system(size: 10, weight: selectedTab == .library ? .bold : .medium))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3.5)
+                        .background(selectedTab == .library ? Color.accentColor : Color.white.opacity(0.08))
+                        .clipShape(Capsule())
+                        .foregroundColor(selectedTab == .library ? .white : DesignSystem.Colors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
 
-                    TextField("Search \(musicStudioProvider.libraryTracks.count) songs or type play, pause, forward...", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 11))
+                    Button(action: {
+                        selectedTab = .stream
+                        if onlineTracks.isEmpty {
+                            triggerOnlineSearch()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "globe")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text("Stream Online")
+                                .font(.system(size: 10, weight: selectedTab == .stream ? .bold : .medium))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3.5)
+                        .background(selectedTab == .stream ? Color.accentColor : Color.white.opacity(0.08))
+                        .clipShape(Capsule())
+                        .foregroundColor(selectedTab == .stream ? .white : DesignSystem.Colors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer()
+
+                if selectedTab == .library {
+                    // Shuffle Play button
+                    Button(action: {
+                        if let randomTrack = musicStudioProvider.libraryTracks.randomElement() {
+                            musicStudioProvider.playTrack(randomTrack)
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "shuffle")
+                                .font(.system(size: 9, weight: .semibold))
+                            Text("Shuffle")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3.5)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Capsule())
                         .foregroundColor(DesignSystem.Colors.textPrimary)
-                        .onSubmit {
-                            if let action = detectedKeywordAction {
-                                executeKeywordAction(action)
-                            } else if let first = filteredTracks.first {
-                                musicStudioProvider.playTrack(first)
-                            }
-                        }
-
-                    if !searchText.isEmpty {
-                        Button(action: { searchText = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 10))
-                                .foregroundColor(DesignSystem.Colors.textTertiary)
-                        }
-                        .buttonStyle(.plain)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Shuffle play local library")
+                } else {
+                    if isSearchingOnline {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                            .frame(width: 14, height: 14)
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.white.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-
-                // Shuffle Play button
-                Button(action: {
-                    if let randomTrack = musicStudioProvider.libraryTracks.randomElement() {
-                        musicStudioProvider.playTrack(randomTrack)
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "shuffle")
-                            .font(.system(size: 10, weight: .semibold))
-                        Text("Shuffle")
-                            .font(.system(size: 10, weight: .medium))
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(Capsule())
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                }
-                .buttonStyle(.plain)
-                .help("Shuffle play Music Studio library")
             }
             .padding(.horizontal, 4)
 
-            // Keyword Action Quick Execution Banner
-            if let action = detectedKeywordAction {
+            // Search Bar
+            HStack(spacing: 6) {
+                Image(systemName: selectedTab == .stream ? "network" : "magnifyingglass")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(DesignSystem.Colors.textTertiary)
+
+                TextField(
+                    selectedTab == .stream
+                        ? "Search millions of songs to stream live..."
+                        : "Search \(musicStudioProvider.libraryTracks.count) songs or type play, pause, forward...",
+                    text: $searchText
+                )
+                .textFieldStyle(.plain)
+                .font(.system(size: 11))
+                .foregroundColor(DesignSystem.Colors.textPrimary)
+                .onChange(of: searchText) { _ in
+                    if selectedTab == .stream {
+                        triggerOnlineSearch()
+                    }
+                }
+                .onSubmit {
+                    if selectedTab == .library {
+                        if let action = detectedKeywordAction {
+                            executeKeywordAction(action)
+                        } else if let first = filteredLocalTracks.first {
+                            musicStudioProvider.playTrack(first)
+                        }
+                    } else {
+                        if let first = onlineTracks.first {
+                            musicStudioProvider.streamTrack(first)
+                        }
+                    }
+                }
+
+                if !searchText.isEmpty {
+                    Button(action: {
+                        searchText = ""
+                        if selectedTab == .stream {
+                            triggerOnlineSearch()
+                        }
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(DesignSystem.Colors.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4.5)
+            .background(Color.white.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .padding(.horizontal, 4)
+
+            // Keyword Action Quick Execution Banner (in library mode)
+            if selectedTab == .library, let action = detectedKeywordAction {
                 Button(action: {
                     executeKeywordAction(action)
                 }) {
@@ -201,31 +308,37 @@ public struct MusicStudioListView: View {
                 .padding(.horizontal, 4)
             }
 
-            // Scrollable Track List
-            if filteredTracks.isEmpty {
-                VStack(spacing: 6) {
-                    Spacer()
-                    Image(systemName: "music.note.list")
-                        .font(.system(size: 24))
-                        .foregroundColor(DesignSystem.Colors.textTertiary)
-                    Text(searchText.isEmpty ? "Loading Music Studio tracks..." : "No matching tracks found")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignSystem.Colors.textSecondary)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView(.vertical, showsIndicators: true) {
-                    LazyVStack(spacing: 2) {
-                        ForEach(Array(filteredTracks.enumerated()), id: \.element.id) { index, track in
-                            trackRow(track: track, index: index)
-                        }
+            // Fallback prompt: If searching in library returns 0, offer to stream online
+            if selectedTab == .library && filteredLocalTracks.isEmpty && !searchText.isEmpty {
+                Button(action: {
+                    selectedTab = .stream
+                    triggerOnlineSearch()
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "globe")
+                            .font(.system(size: 10))
+                        Text("Search & stream \"\(searchText)\" online ➔")
+                            .font(.system(size: 11, weight: .semibold))
                     }
-                    .padding(.horizontal, 2)
-                    .padding(.vertical, 2)
+                    .foregroundColor(.accentColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.accentColor.opacity(0.12))
+                    .clipShape(Capsule())
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .buttonStyle(.plain)
+                .padding(.vertical, 4)
             }
+
+            // Scrollable Track List
+            Group {
+                if selectedTab == .library {
+                    libraryListView
+                } else {
+                    onlineStreamListView
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -250,12 +363,82 @@ public struct MusicStudioListView: View {
         }
     }
 
+    // MARK: - Library List View
+    private var libraryListView: some View {
+        Group {
+            if filteredLocalTracks.isEmpty {
+                VStack(spacing: 6) {
+                    Spacer()
+                    Image(systemName: "music.note.list")
+                        .font(.system(size: 24))
+                        .foregroundColor(DesignSystem.Colors.textTertiary)
+                    Text(searchText.isEmpty ? "Loading Music Studio tracks..." : "No matching local tracks")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                    Spacer()
+                }
+            } else {
+                ScrollView(.vertical, showsIndicators: true) {
+                    LazyVStack(spacing: 2) {
+                        ForEach(Array(filteredLocalTracks.enumerated()), id: \.element.id) { index, track in
+                            trackRow(track: track, index: index, isOnline: false)
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
+    // MARK: - Online Stream List View
+    private var onlineStreamListView: some View {
+        Group {
+            if isSearchingOnline && onlineTracks.isEmpty {
+                VStack(spacing: 8) {
+                    Spacer()
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Searching online streams...")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                    Spacer()
+                }
+            } else if onlineTracks.isEmpty {
+                VStack(spacing: 6) {
+                    Spacer()
+                    Image(systemName: "waveform.badge.magnifyingglass")
+                        .font(.system(size: 24))
+                        .foregroundColor(DesignSystem.Colors.textTertiary)
+                    Text(searchText.isEmpty ? "Search for any artist, song, or album" : "No online results found for \"\(searchText)\"")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                    Spacer()
+                }
+            } else {
+                ScrollView(.vertical, showsIndicators: true) {
+                    LazyVStack(spacing: 2) {
+                        ForEach(Array(onlineTracks.enumerated()), id: \.element.id) { index, track in
+                            trackRow(track: track, index: index, isOnline: true)
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
     @ViewBuilder
-    private func trackRow(track: MusicStudioTrack, index: Int) -> some View {
+    private func trackRow(track: MusicStudioTrack, index: Int, isOnline: Bool) -> some View {
         let isCurrent = isTrackCurrent(track)
 
         Button(action: {
-            musicStudioProvider.playTrack(track)
+            if isOnline || track.isStream {
+                musicStudioProvider.streamTrack(track)
+            } else {
+                musicStudioProvider.playTrack(track)
+            }
         }) {
             HStack(spacing: 10) {
                 // Index / Live Equalizer Icon
@@ -273,15 +456,27 @@ public struct MusicStudioListView: View {
                 .frame(width: 20, alignment: .center)
 
                 // Track Artwork Thumbnail
-                TrackArtworkThumbnail(filename: track.filename, isPlaying: isCurrent)
+                TrackArtworkThumbnail(track: track, isPlaying: isCurrent)
 
                 // Title & Artist
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(track.title)
-                        .font(.system(size: 11, weight: isCurrent ? .bold : .medium))
-                        .foregroundColor(isCurrent ? .accentColor : DesignSystem.Colors.textPrimary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    HStack(spacing: 4) {
+                        Text(track.title)
+                            .font(.system(size: 11, weight: isCurrent ? .bold : .medium))
+                            .foregroundColor(isCurrent ? .accentColor : DesignSystem.Colors.textPrimary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+
+                        if isOnline || track.isStream {
+                            Text("STREAM")
+                                .font(.system(size: 7, weight: .heavy))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.accentColor.opacity(0.8))
+                                .clipShape(Capsule())
+                        }
+                    }
 
                     Text(track.artist.isEmpty ? "Music Studio" : track.artist)
                         .font(.system(size: 9))
@@ -298,7 +493,7 @@ public struct MusicStudioListView: View {
                         .foregroundColor(DesignSystem.Colors.textTertiary)
                 }
 
-                // Play / Pause Mini Button
+                // Play / Stream Mini Action Button
                 Image(systemName: isCurrent && musicStudioProvider.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 9))
                     .foregroundColor(isCurrent ? .accentColor : DesignSystem.Colors.textTertiary)
@@ -327,9 +522,9 @@ public struct MusicStudioListView: View {
     }
 }
 
-/// Thumbnail view for a Music Studio track artwork
+/// Thumbnail view for a Music Studio track artwork supporting both local ID3 and remote CDN covers
 private struct TrackArtworkThumbnail: View {
-    let filename: String
+    let track: MusicStudioTrack
     let isPlaying: Bool
     @State private var image: NSImage?
 
@@ -345,7 +540,7 @@ private struct TrackArtworkThumbnail: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                Image(systemName: "music.note")
+                Image(systemName: track.isStream ? "waveform.badge.magnifyingglass" : "music.note")
                     .font(.system(size: 9))
                     .foregroundColor(.white)
             }
@@ -358,22 +553,39 @@ private struct TrackArtworkThumbnail: View {
     }
 
     private func loadArtwork() {
-        let localFileURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Music/Music Studio")
-            .appendingPathComponent(filename)
-        if let img = MusicStudioNowPlayingProvider.extractArtwork(from: localFileURL) {
-            self.image = img
+        // 1. Direct remote cover URL (for streamed songs)
+        if let cover = track.cover_url, cover.hasPrefix("http") {
+            guard let url = URL(string: cover) else { return }
+            Task {
+                if let (data, _) = try? await URLSession.shared.data(from: url),
+                   let img = NSImage(data: data) {
+                    await MainActor.run {
+                        self.image = img
+                    }
+                }
+            }
             return
         }
 
-        guard let encoded = filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
-              let url = URL(string: "http://127.0.0.1:5050/api/songs/artwork/\(encoded)") else { return }
+        // 2. Local Music Studio library ID3 extraction
+        if !track.filename.isEmpty {
+            let localFileURL = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Music/Music Studio")
+                .appendingPathComponent(track.filename)
+            if let img = MusicStudioNowPlayingProvider.extractArtwork(from: localFileURL) {
+                self.image = img
+                return
+            }
 
-        Task {
-            if let (data, _) = try? await URLSession.shared.data(from: url),
-               let img = NSImage(data: data) {
-                await MainActor.run {
-                    self.image = img
+            guard let encoded = track.filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+                  let url = URL(string: "http://127.0.0.1:5050/api/songs/artwork/\(encoded)") else { return }
+
+            Task {
+                if let (data, _) = try? await URLSession.shared.data(from: url),
+                   let img = NSImage(data: data) {
+                    await MainActor.run {
+                        self.image = img
+                    }
                 }
             }
         }
