@@ -10,6 +10,8 @@ public struct MusicStudioListView: View {
     @State private var onlineTracks: [MusicStudioTrack] = []
     @State private var isSearchingOnline: Bool = false
     @State private var searchDebounceTask: Task<Void, Never>? = nil
+    @State private var trackToDelete: MusicStudioTrack? = nil
+    @State private var showDeleteAlert: Bool = false
 
     public init(musicStudioProvider: MusicStudioNowPlayingProvider) {
         self.musicStudioProvider = musicStudioProvider
@@ -385,6 +387,19 @@ public struct MusicStudioListView: View {
             musicStudioProvider.previous()
             return .handled
         }
+        .alert("Delete Track?", isPresented: $showDeleteAlert, presenting: trackToDelete) { track in
+            Button("Cancel", role: .cancel) {
+                trackToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                Task {
+                    _ = await musicStudioProvider.deleteTrack(track)
+                    trackToDelete = nil
+                }
+            }
+        } message: { track in
+            Text("Are you sure you want to delete \"\(track.title)\" by \(track.artist)? This will permanently remove the audio file from your library and computer.")
+        }
     }
 
     // MARK: - Library List View
@@ -522,6 +537,21 @@ public struct MusicStudioListView: View {
                     .font(.system(size: 9))
                     .foregroundColor(isCurrent ? .accentColor : DesignSystem.Colors.textTertiary)
                     .frame(width: 18, height: 18)
+
+                // Delete Mini Action Button (for downloaded library songs)
+                if !isOnline && !track.isStream {
+                    Button(action: {
+                        trackToDelete = track
+                        showDeleteAlert = true
+                    }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 9))
+                            .foregroundColor(DesignSystem.Colors.textTertiary.opacity(0.75))
+                            .frame(width: 18, height: 18)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Delete \"\(track.title)\" from Library")
+                }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
@@ -532,6 +562,16 @@ public struct MusicStudioListView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if !isOnline && !track.isStream {
+                Button(role: .destructive, action: {
+                    trackToDelete = track
+                    showDeleteAlert = true
+                }) {
+                    Label("Delete from Library", systemImage: "trash")
+                }
+            }
+        }
     }
 
     private func isTrackCurrent(_ track: MusicStudioTrack) -> Bool {

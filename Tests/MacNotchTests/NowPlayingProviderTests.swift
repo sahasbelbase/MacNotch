@@ -194,4 +194,18 @@ final class NowPlayingProviderTests: XCTestCase {
             XCTAssertFalse(first.artist.isEmpty)
         }
     }
+
+    @MainActor
+    func testDeleteTrackSafety() async {
+        let provider = MusicStudioNowPlayingProvider()
+        // Empty filename (stream track) should fail immediately
+        let streamTrack = MusicStudioTrack(filename: "", title: "Test", artist: "Artist", album: "Album")
+        let streamResult = await provider.deleteTrack(streamTrack)
+        XCTAssertFalse(streamResult, "Deleting a stream track with empty filename should fail")
+
+        // Nonexistent file should fail safely without crashing
+        let fakeTrack = MusicStudioTrack(filename: "nonexistent_track_99999.mp3", title: "Nonexistent", artist: "Ghost", album: "Void")
+        let fakeResult = await provider.deleteTrack(fakeTrack)
+        XCTAssertFalse(fakeResult, "Deleting a nonexistent file should return false")
+    }
 }

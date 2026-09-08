@@ -401,6 +401,49 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         self.onUpdate?()
     }
 
+    // MARK: - Library Management
+
+    /// Deletes a track permanently from the Music Studio library and disk.
+    @discardableResult
+    public func deleteTrack(_ track: MusicStudioTrack) async -> Bool {
+        guard !track.filename.isEmpty else { return false }
+        let encoded = track.filename.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? track.filename
+
+        var success = false
+        if let url = URL(string: "\(baseURL)/api/songs/\(encoded)") {
+            var request = URLRequest(url: url)
+            request.httpMethod = "DELETE"
+            if let (_, response) = try? await session.data(for: request),
+               let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+                success = true
+            }
+        }
+
+        // Fallback to direct file removal on disk if server is offline or unreachable
+        let localFileURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Music/Music Studio")
+            .appendingPathComponent(track.filename)
+        if FileManager.default.fileExists(atPath: localFileURL.path) {
+            try? FileManager.default.removeItem(at: localFileURL)
+            success = true
+        }
+
+        if success {
+            self.libraryTracks.removeAll { $0.filename == track.filename }
+            if self.currentTrack?.title == track.title && self.currentTrack?.artist == track.artist {
+                self.isPlaying = false
+                self.currentTrack = nil
+                self.artwork = nil
+                self.currentTime = 0
+                self.duration = 0
+            }
+            self.onUpdate?()
+            self.fetchLibrary()
+        }
+
+        return success
+    }
+
     /// Streams an online song on-the-fly via Music Studio audio engine.
     public func streamTrack(_ track: MusicStudioTrack) {
         self.currentTrack = Track(
