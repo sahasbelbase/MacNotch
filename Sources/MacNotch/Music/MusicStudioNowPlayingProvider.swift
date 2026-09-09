@@ -555,14 +555,11 @@ public final class MusicStudioNowPlayingProvider: NowPlayingProvider, Observable
         self.isPlaying = true
         self.isAvailable = true
 
-        if let current = currentTrack,
-           let matched = libraryTracks.first(where: {
-               $0.title.lowercased() == current.title.lowercased() ||
-               $0.filename.lowercased() == current.title.lowercased() + ".mp3"
-           }) {
-            playTrack(matched)
-            return
+        if currentTrack != nil {
+            // Resume playback of current track from its paused position without resetting to 0:00
+            sendAction("play")
         } else if let first = libraryTracks.first {
+            // First-time play when no track was loaded
             playTrack(first)
             return
         } else {

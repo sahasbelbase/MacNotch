@@ -106,11 +106,7 @@ public final class MediaRemoteNowPlayingProvider: NowPlayingProvider {
                     MainActor.assumeIsolated {
                         guard let self = self else { return }
                         guard let dict = rawDict as? [String: Any] else {
-                            if !self.isPlaying {
-                                self.currentTrack = nil
-                                self.artwork = nil
-                                self.onUpdate?()
-                            }
+                            self.onUpdate?()
                             return
                         }
 
@@ -130,12 +126,7 @@ public final class MediaRemoteNowPlayingProvider: NowPlayingProvider {
                             // Extract artwork if available
                             if let artData = dict["kMRMediaRemoteNowPlayingInfoArtworkData"] as? Data {
                                 self.artwork = NSImage(data: artData)
-                            } else {
-                                self.artwork = nil
                             }
-                        } else if !self.isPlaying {
-                            self.currentTrack = nil
-                            self.artwork = nil
                         }
 
                         self.onUpdate?()

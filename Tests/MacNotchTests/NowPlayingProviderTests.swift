@@ -236,5 +236,41 @@ final class NowPlayingProviderTests: XCTestCase {
         XCTAssertNotNil(service.activePlayer)
         XCTAssertFalse(service.activePlayer.rawValue.isEmpty)
     }
+
+    @MainActor
+    func testMusicStudioPauseAndResumePreservesTrack() {
+        let provider = MusicStudioNowPlayingProvider()
+        let track = MusicStudioTrack(
+            filename: "test_resume.mp3",
+            title: "Test Song",
+            artist: "Artist",
+            album: "Album",
+            duration: 180.0
+        )
+
+        // Start playing track
+        provider.playTrack(track)
+        XCTAssertTrue(provider.isPlaying)
+        XCTAssertEqual(provider.currentTrack?.title, "Test Song")
+
+        // Pause playback
+        provider.pause()
+        XCTAssertFalse(provider.isPlaying)
+        XCTAssertEqual(provider.currentTrack?.title, "Test Song", "Pausing must preserve the current track")
+
+        // Resume playback via play()
+        provider.play()
+        XCTAssertTrue(provider.isPlaying)
+        XCTAssertEqual(provider.currentTrack?.title, "Test Song", "Resuming must preserve the current track without resetting")
+
+        // Pause and resume via togglePlayPause()
+        provider.togglePlayPause()
+        XCTAssertFalse(provider.isPlaying)
+        XCTAssertEqual(provider.currentTrack?.title, "Test Song")
+
+        provider.togglePlayPause()
+        XCTAssertTrue(provider.isPlaying)
+        XCTAssertEqual(provider.currentTrack?.title, "Test Song")
+    }
 }
 

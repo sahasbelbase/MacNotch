@@ -484,7 +484,9 @@ public struct MusicStudioListView: View {
         let isCurrent = isTrackCurrent(track)
 
         Button(action: {
-            if isOnline || track.isStream {
+            if isCurrent {
+                musicStudioProvider.togglePlayPause()
+            } else if isOnline || track.isStream {
                 musicStudioProvider.streamTrack(track)
             } else {
                 musicStudioProvider.playTrack(track)

@@ -164,7 +164,7 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
                 album: album,
                 duration: duration
             )
-        } else if !self.appleMusicIsPlaying {
+        } else if playerState == "Stopped" {
             self.appleMusicTrack = nil
         }
 
@@ -186,7 +186,7 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
                 album: album,
                 duration: duration
             )
-        } else if !self.spotifyIsPlaying {
+        } else if playerState == "Stopped" {
             self.spotifyTrack = nil
         }
 
@@ -303,7 +303,41 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
         }
 
         // F. Idle States (Nothing actively playing right now)
-        // Check running apps first:
+        // 1. If the current active player still has a valid paused track, retain it!
+        // This ensures pausing and resuming from the notch never switches players or resets track position.
+        switch activePlayer {
+        case .musicStudio:
+            if musicStudioProvider.currentTrack != nil {
+                selectMusicStudio(playing: false)
+                return
+            }
+        case .spotify:
+            if let track = spotifyTrack ?? mediaRemoteProvider.currentTrack {
+                self.currentTrack = track
+                self.isPlaying = false
+                self.artwork = mediaRemoteProvider.artwork
+                return
+            }
+        case .appleMusic:
+            if let track = appleMusicTrack ?? mediaRemoteProvider.currentTrack {
+                self.currentTrack = track
+                self.isPlaying = false
+                self.artwork = mediaRemoteProvider.artwork
+                return
+            }
+        case .youtubeMusic:
+            if mediaRemoteProvider.currentTrack != nil {
+                selectYouTubeMusic(playing: false)
+                return
+            }
+        case .mediaRemote:
+            if mediaRemoteProvider.currentTrack != nil {
+                selectMediaRemote(playing: false)
+                return
+            }
+        }
+
+        // 2. Otherwise (current active player has no track), check running apps with tracks:
         if musicStudioProvider.isAvailable, musicStudioProvider.currentTrack != nil {
             selectMusicStudio(playing: false)
             return
@@ -524,10 +558,18 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
             self.currentTrack = musicStudioProvider.currentTrack
             self.artwork = musicStudioProvider.artwork
         case .spotify:
-            executeAppleScript("tell application \"Spotify\" to play")
+            if !isPlaying && currentTrack != nil {
+                executeAppleScript("tell application \"Spotify\" to playpause")
+            } else {
+                executeAppleScript("tell application \"Spotify\" to play")
+            }
             self.isPlaying = true
         case .appleMusic:
-            executeAppleScript("tell application \"Music\" to play")
+            if !isPlaying && currentTrack != nil {
+                executeAppleScript("tell application \"Music\" to playpause")
+            } else {
+                executeAppleScript("tell application \"Music\" to play")
+            }
             self.isPlaying = true
         case .youtubeMusic, .mediaRemote:
             mediaRemoteProvider.play()
@@ -563,13 +605,13 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
             } else if isSpotifyRunning || (isSpotifyDownloaded && !isMusicStudioDownloaded) {
                 activePlayer = .spotify
                 activePlayerName = "Spotify"
-                executeAppleScript("tell application \"Spotify\" to play")
+                executeAppleScript("tell application \"Spotify\" to playpause")
                 isPlaying = true
                 return
             } else if isAppleMusicRunning || (!isMusicStudioDownloaded && !isSpotifyDownloaded) {
                 activePlayer = .appleMusic
                 activePlayerName = "Apple Music"
-                executeAppleScript("tell application \"Music\" to play")
+                executeAppleScript("tell application \"Music\" to playpause")
                 isPlaying = true
                 return
             } else if isYouTubeMusicRunning {
