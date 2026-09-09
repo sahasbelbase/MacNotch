@@ -86,11 +86,18 @@ public struct PowerToolsView: View {
         .padding(10)
         .macNotchCardStyle()
         .onAppear {
-            if let firstClip = clipboardManager.items.first?.textContent ?? clipboardManager.items.first?.preview, !firstClip.isEmpty {
-                qrInputText = firstClip
-                qrImage = QRCodeService.shared.generateQRCode(from: firstClip, size: 120)
+            refreshHardwareBrightness()
+        }
+        .onChange(of: activeToolTab) { newTab in
+            if newTab == .hardware {
+                refreshHardwareBrightness()
             }
         }
+    }
+
+    private func refreshHardwareBrightness() {
+        screenBrightness = HardwareBrightnessService.shared.getDisplayBrightness()
+        keyboardBrightness = HardwareBrightnessService.shared.getKeyboardBrightness()
     }
 
     // MARK: - Screenshot Studio Card
@@ -231,6 +238,7 @@ public struct PowerToolsView: View {
                 Slider(value: $keyboardBrightness, in: 0...1)
                     .accentColor(.cyan)
                     .onChange(of: keyboardBrightness) { newVal in
+                        HardwareBrightnessService.shared.setKeyboardBrightness(newVal)
                         appState.showHUD(.keyboardBrightness(level: newVal), duration: 2.0)
                     }
             }
@@ -256,6 +264,7 @@ public struct PowerToolsView: View {
                 Slider(value: $screenBrightness, in: 0...1)
                     .accentColor(.yellow)
                     .onChange(of: screenBrightness) { newVal in
+                        HardwareBrightnessService.shared.setDisplayBrightness(newVal)
                         appState.showHUD(.brightness(level: newVal), duration: 2.0)
                     }
             }

@@ -26,6 +26,8 @@ public final class SystemHUDService: ObservableObject {
 
     public init() {
         self.isCapsLockOn = NSEvent.modifierFlags.contains(.capsLock)
+        self.screenBrightness = HardwareBrightnessService.shared.getDisplayBrightness()
+        self.keyboardBrightness = HardwareBrightnessService.shared.getKeyboardBrightness()
         setupCapsLockMonitoring()
         setupVolumeMonitoring()
         setupMediaKeyMonitoring()
@@ -210,6 +212,7 @@ public final class SystemHUDService: ObservableObject {
     public func setKeyboardBrightness(_ level: Float) {
         let clamped = max(0.0, min(1.0, level))
         self.keyboardBrightness = clamped
+        HardwareBrightnessService.shared.setKeyboardBrightness(clamped)
         onKeyboardBrightnessChange?(clamped)
     }
 
@@ -228,6 +231,7 @@ public final class SystemHUDService: ObservableObject {
     public func setScreenBrightness(_ level: Float) {
         let clamped = max(0.0, min(1.0, level))
         self.screenBrightness = clamped
+        HardwareBrightnessService.shared.setDisplayBrightness(clamped)
         onScreenBrightnessChange?(clamped)
     }
 

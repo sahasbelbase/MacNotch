@@ -122,4 +122,27 @@ final class HardwareDynamicsTests: XCTestCase {
         XCTAssertEqual(hudService.screenBrightness, 0.95, accuracy: 0.001)
         XCTAssertEqual(receivedScrLevel, 0.95)
     }
+
+    func testHardwareBrightnessServiceDirectControl() {
+        let service = HardwareBrightnessService.shared
+        let initialDisplay = service.getDisplayBrightness()
+        XCTAssertGreaterThanOrEqual(initialDisplay, 0.0)
+        XCTAssertLessThanOrEqual(initialDisplay, 1.0)
+
+        service.setDisplayBrightness(0.65)
+        XCTAssertEqual(service.getDisplayBrightness(), 0.65, accuracy: 0.05)
+
+        // Restore initial display brightness
+        service.setDisplayBrightness(initialDisplay)
+
+        let initialKeyboard = service.getKeyboardBrightness()
+        XCTAssertGreaterThanOrEqual(initialKeyboard, 0.0)
+        XCTAssertLessThanOrEqual(initialKeyboard, 1.0)
+
+        service.setKeyboardBrightness(0.45)
+        XCTAssertEqual(service.getKeyboardBrightness(), 0.45, accuracy: 0.05)
+
+        // Restore initial keyboard brightness
+        service.setKeyboardBrightness(initialKeyboard)
+    }
 }
