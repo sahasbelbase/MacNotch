@@ -182,4 +182,10 @@ final class HardwareDynamicsTests: XCTestCase {
         appState.transition(to: .expanded)
         XCTAssertNil(appState.activeHUD)
     }
+
+    func testScreenCapturePermissionHelper() {
+        let helper = ScreenCapturePermissionHelper.shared
+        _ = helper.hasPermission
+        XCTAssertNotNil(helper)
+    }
 }

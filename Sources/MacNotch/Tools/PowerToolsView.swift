@@ -12,6 +12,7 @@ public struct PowerToolsView: View {
     @State private var isProcessing: Bool = false
     @State private var keyboardBrightness: Float = 0.5
     @State private var screenBrightness: Float = 0.7
+    @State private var hasScreenRecordingPermission: Bool = true
 
     public enum PowerToolTab: String, CaseIterable {
         case screenshot = "Screenshot"
@@ -87,10 +88,16 @@ public struct PowerToolsView: View {
         .macNotchCardStyle()
         .onAppear {
             refreshHardwareBrightness()
+            hasScreenRecordingPermission = ScreenCapturePermissionHelper.shared.hasPermission
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            hasScreenRecordingPermission = ScreenCapturePermissionHelper.shared.hasPermission
         }
         .onChange(of: activeToolTab) { newTab in
             if newTab == .hardware {
                 refreshHardwareBrightness()
+            } else if newTab == .screenshot || newTab == .screenOCR {
+                hasScreenRecordingPermission = ScreenCapturePermissionHelper.shared.hasPermission
             }
         }
     }
@@ -100,79 +107,151 @@ public struct PowerToolsView: View {
         keyboardBrightness = HardwareBrightnessService.shared.getKeyboardBrightness()
     }
 
-    // MARK: - Screenshot Studio Card
+    // MARK: - Permission Notice Banner
 
-    private var screenshotCard: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "camera.viewfinder")
-                .font(.system(size: 24))
-                .foregroundColor(.purple)
-                .frame(width: 44, height: 44)
-                .background(Color.purple.opacity(0.15))
-                .clipShape(Circle())
+    private var permissionNoticeBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lock.shield.fill")
+                .foregroundColor(.yellow)
+                .font(.system(size: 13))
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Screenshot Studio")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                Text("Capture interactive selection, window, or entire screen. Saves directly to Desktop & Clipboard.")
-                    .font(.system(size: 10))
-                    .foregroundColor(DesignSystem.Colors.textTertiary)
-                    .lineLimit(2)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Screen Recording Access Required")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.yellow)
+                Text("Enable MacNotch in System Settings, then restart to apply.")
+                    .font(.system(size: 9))
+                    .foregroundColor(.white.opacity(0.8))
             }
 
             Spacer()
 
-            HStack(spacing: 6) {
-                Button(action: { triggerScreenshot(mode: .selection) }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "rectangle.dashed")
-                        Text("Area")
-                    }
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(Color.purple)
-                    .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-
-                Button(action: { triggerScreenshot(mode: .window) }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "macwindow")
-                        Text("Window")
-                    }
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-
-                Button(action: { triggerScreenshot(mode: .fullScreen) }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "display")
-                        Text("Full")
-                    }
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
+            Button("Grant Access") {
+                ScreenCapturePermissionHelper.shared.requestPermission()
+                ScreenCapturePermissionHelper.shared.openScreenRecordingSettings()
             }
+            .font(.system(size: 10, weight: .bold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.yellow.opacity(0.25))
+            .foregroundColor(.yellow)
+            .clipShape(Capsule())
+            .buttonStyle(.plain)
+
+            Button("Restart App") {
+                ScreenCapturePermissionHelper.shared.restartApp()
+            }
+            .font(.system(size: 10, weight: .bold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.white.opacity(0.12))
+            .foregroundColor(.white)
+            .clipShape(Capsule())
+            .buttonStyle(.plain)
         }
         .padding(8)
-        .background(Color.white.opacity(0.03))
+        .background(Color.yellow.opacity(0.1))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.yellow.opacity(0.35), lineWidth: 1)
+        )
         .cornerRadius(8)
     }
 
+    // MARK: - Screenshot Studio Card
+
+    private var screenshotCard: some View {
+        VStack(spacing: 8) {
+            if !hasScreenRecordingPermission {
+                permissionNoticeBanner
+            }
+
+            HStack(spacing: 12) {
+                Image(systemName: "camera.viewfinder")
+                    .font(.system(size: 24))
+                    .foregroundColor(.purple)
+                    .frame(width: 44, height: 44)
+                    .background(Color.purple.opacity(0.15))
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Screenshot Studio")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                    Text("Capture interactive selection, window, or entire screen. Saves directly to Desktop & Clipboard.")
+                        .font(.system(size: 10))
+                        .foregroundColor(DesignSystem.Colors.textTertiary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                HStack(spacing: 6) {
+                    Button(action: { triggerScreenshot(mode: .selection) }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "rectangle.dashed")
+                            Text("Area")
+                        }
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(Color.purple)
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: { triggerScreenshot(mode: .window) }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "macwindow")
+                            Text("Window")
+                        }
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: { triggerScreenshot(mode: .fullScreen) }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "display")
+                            Text("Full")
+                        }
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(8)
+            .background(Color.white.opacity(0.03))
+            .cornerRadius(8)
+        }
+    }
+
     private func triggerScreenshot(mode: ScreenshotMode) {
+        guard ScreenCapturePermissionHelper.shared.hasPermission else {
+            hasScreenRecordingPermission = false
+            ScreenCapturePermissionHelper.shared.requestPermission()
+            ScreenCapturePermissionHelper.shared.openScreenRecordingSettings()
+            appState.showHUD(
+                .notification(
+                    title: "Permission Needed",
+                    subtitle: "Enable MacNotch in Screen Recording",
+                    icon: "lock.shield.fill"
+                ),
+                duration: 3.5
+            )
+            return
+        }
+
         guard let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first else { return }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
@@ -328,53 +407,74 @@ public struct PowerToolsView: View {
     // MARK: - Screen OCR Card
 
     private var screenOCRCard: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "text.viewfinder")
-                .font(.system(size: 24))
-                .foregroundColor(.cyan)
-                .frame(width: 44, height: 44)
-                .background(Color.cyan.opacity(0.12))
-                .clipShape(Circle())
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Screen Text OCR")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                Text("Select any area of your screen with crosshairs to extract and copy text immediately.")
-                    .font(.system(size: 10))
-                    .foregroundColor(DesignSystem.Colors.textTertiary)
-                    .lineLimit(2)
+        VStack(spacing: 8) {
+            if !hasScreenRecordingPermission {
+                permissionNoticeBanner
             }
 
-            Spacer()
+            HStack(spacing: 12) {
+                Image(systemName: "text.viewfinder")
+                    .font(.system(size: 24))
+                    .foregroundColor(.cyan)
+                    .frame(width: 44, height: 44)
+                    .background(Color.cyan.opacity(0.12))
+                    .clipShape(Circle())
 
-            Button(action: triggerOCR) {
-                HStack(spacing: 4) {
-                    if isProcessing {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                            .frame(width: 12, height: 12)
-                    } else {
-                        Image(systemName: "viewfinder")
-                    }
-                    Text("Capture Area")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Screen Text OCR")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                    Text("Select any area of your screen with crosshairs to extract and copy text immediately.")
+                        .font(.system(size: 10))
+                        .foregroundColor(DesignSystem.Colors.textTertiary)
+                        .lineLimit(2)
                 }
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.black)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.cyan)
-                .clipShape(Capsule())
+
+                Spacer()
+
+                Button(action: triggerOCR) {
+                    HStack(spacing: 4) {
+                        if isProcessing {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                                .frame(width: 12, height: 12)
+                        } else {
+                            Image(systemName: "viewfinder")
+                        }
+                        Text("Capture Area")
+                    }
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.cyan)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(isProcessing)
             }
-            .buttonStyle(.plain)
-            .disabled(isProcessing)
+            .padding(8)
+            .background(Color.white.opacity(0.03))
+            .cornerRadius(8)
         }
-        .padding(8)
-        .background(Color.white.opacity(0.03))
-        .cornerRadius(8)
     }
 
     private func triggerOCR() {
+        guard ScreenCapturePermissionHelper.shared.hasPermission else {
+            hasScreenRecordingPermission = false
+            ScreenCapturePermissionHelper.shared.requestPermission()
+            ScreenCapturePermissionHelper.shared.openScreenRecordingSettings()
+            appState.showHUD(
+                .notification(
+                    title: "Permission Needed",
+                    subtitle: "Enable MacNotch in Screen Recording",
+                    icon: "lock.shield.fill"
+                ),
+                duration: 3.5
+            )
+            return
+        }
+
         isProcessing = true
         ScreenOCRService.shared.captureAndRecognize { recognized in
             isProcessing = false

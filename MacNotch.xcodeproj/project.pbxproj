@@ -28,6 +28,7 @@
 		F56D3BF5711A49968D352416 /* PowerToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB414FD5DB14362B567EE81 /* PowerToolsView.swift */; };
 		8AE75CF9574046A9B27DC9B3 /* QRCodeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25BEE42527844EDDBA0DF2E0 /* QRCodeService.swift */; };
 		EC8CD5FDF3FD4B578EC29B73 /* ScreenOCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B88330C2A745A6979FC2FD /* ScreenOCRService.swift */; };
+		A1B2C3D4E5F60718293A4B01 /* ScreenCapturePermissionHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B02 /* ScreenCapturePermissionHelper.swift */; };
 		B4453D0C98CA48E3B5E67566 /* CalendarSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D1EDC403644E9881F0DB55 /* CalendarSyncService.swift */; };
 		8263D736AC0548A1844D9888 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 993258998A384371AF64DE17 /* AppState.swift */; };
 		7A32B9D0B63C49229C8A2B6E /* BatteryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6BA97046DF64AFB8886A5B6 /* BatteryService.swift */; };
@@ -97,6 +98,7 @@
 		5DB414FD5DB14362B567EE81 /* PowerToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/MacNotch/Tools/PowerToolsView.swift"; sourceTree = "<group>"; };
 		25BEE42527844EDDBA0DF2E0 /* QRCodeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/MacNotch/Tools/QRCodeService.swift"; sourceTree = "<group>"; };
 		73B88330C2A745A6979FC2FD /* ScreenOCRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/MacNotch/Tools/ScreenOCRService.swift"; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B02 /* ScreenCapturePermissionHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/MacNotch/Tools/ScreenCapturePermissionHelper.swift"; sourceTree = "<group>"; };
 		53D1EDC403644E9881F0DB55 /* CalendarSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/MacNotch/Calendar/CalendarSyncService.swift"; sourceTree = "<group>"; };
 		993258998A384371AF64DE17 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/MacNotch/Core/AppState.swift"; sourceTree = "<group>"; };
 		E6BA97046DF64AFB8886A5B6 /* BatteryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Sources/MacNotch/Core/BatteryService.swift"; sourceTree = "<group>"; };
@@ -191,6 +193,7 @@
 				5DB414FD5DB14362B567EE81 /* PowerToolsView.swift */,
 				25BEE42527844EDDBA0DF2E0 /* QRCodeService.swift */,
 				73B88330C2A745A6979FC2FD /* ScreenOCRService.swift */,
+				A1B2C3D4E5F60718293A4B02 /* ScreenCapturePermissionHelper.swift */,
 				53D1EDC403644E9881F0DB55 /* CalendarSyncService.swift */,
 				993258998A384371AF64DE17 /* AppState.swift */,
 				E6BA97046DF64AFB8886A5B6 /* BatteryService.swift */,
@@ -347,6 +350,7 @@
 				F56D3BF5711A49968D352416 /* PowerToolsView.swift in Sources */,
 				8AE75CF9574046A9B27DC9B3 /* QRCodeService.swift in Sources */,
 				EC8CD5FDF3FD4B578EC29B73 /* ScreenOCRService.swift in Sources */,
+				A1B2C3D4E5F60718293A4B01 /* ScreenCapturePermissionHelper.swift in Sources */,
 				B4453D0C98CA48E3B5E67566 /* CalendarSyncService.swift in Sources */,
 				8263D736AC0548A1844D9888 /* AppState.swift in Sources */,
 				7A32B9D0B63C49229C8A2B6E /* BatteryService.swift in Sources */,

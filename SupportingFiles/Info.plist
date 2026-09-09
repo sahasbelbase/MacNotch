@@ -28,5 +28,7 @@
     <true/>
     <key>NSAppleEventsUsageDescription</key>
     <string>MacNotch uses Apple Events to display currently playing music track info and controls.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>MacNotch requires screen recording access to capture screenshots and perform text OCR from your screen.</string>
 </dict>
 </plist>

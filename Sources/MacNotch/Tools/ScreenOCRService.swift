@@ -13,6 +13,13 @@ public final class ScreenOCRService {
 
     /// Triggers interactive screen selection crosshairs, captures the image, and extracts text.
     public func captureAndRecognize(completion: ((String?) -> Void)? = nil) {
+        guard ScreenCapturePermissionHelper.shared.hasPermission else {
+            ScreenCapturePermissionHelper.shared.requestPermission()
+            ScreenCapturePermissionHelper.shared.openScreenRecordingSettings()
+            completion?(nil)
+            return
+        }
+
         let tempPath = "/tmp/macnotch_ocr_\(UUID().uuidString).png"
 
         // Execute screencapture in background thread

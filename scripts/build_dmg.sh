@@ -8,6 +8,14 @@ echo "==> Ensuring AppIcon is properly copied to bundle Resources..."
 mkdir -p build/Release/MacNotch.app/Contents/Resources
 cp SupportingFiles/AppIcon.icns build/Release/MacNotch.app/Contents/Resources/AppIcon.icns
 
+echo "==> Signing MacNotch.app with stable Designated Requirement..."
+codesign --force --deep --sign - \
+         --entitlements SupportingFiles/MacNotch.entitlements \
+         -r='designated => identifier "com.sahasbelbase.MacNotch"' \
+         build/Release/MacNotch.app
+
+codesign --verify --deep --strict build/Release/MacNotch.app
+
 echo "==> Preparing DMG staging root..."
 rm -rf build/dmg_root
 mkdir -p build/dmg_root
