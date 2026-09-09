@@ -5,17 +5,23 @@ import Foundation
 @MainActor
 public protocol WeatherServiceProtocol: AnyObject, ObservableObject {
     var currentWeather: WeatherInfo? { get }
+    var dailyForecast: [DayForecastItem] { get }
+    var hourlyForecast: [HourlyForecastItem] { get }
+    var weatherAdvice: WeatherAdvice? { get }
     var isLoading: Bool { get }
     var errorMessage: String? { get }
     func fetchWeather(for location: WeatherLocation) async
 }
 
-/// Fetches real-time weather forecasts via Open-Meteo API with local 15-minute caching.
+/// Fetches real-time weather forecasts, multi-day predictions, and smart advice via Open-Meteo API.
 @MainActor
 public final class WeatherService: ObservableObject, WeatherServiceProtocol {
     public static let shared = WeatherService()
 
     @Published public private(set) var currentWeather: WeatherInfo?
+    @Published public private(set) var dailyForecast: [DayForecastItem] = []
+    @Published public private(set) var hourlyForecast: [HourlyForecastItem] = []
+    @Published public private(set) var weatherAdvice: WeatherAdvice?
     @Published public private(set) var isLoading: Bool = false
     @Published public private(set) var errorMessage: String?
 
@@ -27,7 +33,7 @@ public final class WeatherService: ObservableObject, WeatherServiceProtocol {
         }
     }
 
-    private var cache: [String: (info: WeatherInfo, timestamp: Date)] = [:]
+    private var cache: [String: (info: WeatherInfo, daily: [DayForecastItem], hourly: [HourlyForecastItem], advice: WeatherAdvice?, timestamp: Date)] = [:]
     private let cacheDuration: TimeInterval = 900 // 15 minutes
 
     public init() {
@@ -79,13 +85,16 @@ public final class WeatherService: ObservableObject, WeatherServiceProtocol {
         // Check cache
         if let cached = cache[location.id], Date().timeIntervalSince(cached.timestamp) < cacheDuration {
             self.currentWeather = cached.info
+            self.dailyForecast = cached.daily
+            self.hourlyForecast = cached.hourly
+            self.weatherAdvice = cached.advice
             return
         }
 
         self.isLoading = true
         self.errorMessage = nil
 
-        let urlString = "https://api.open-meteo.com/v1/forecast?latitude=\(location.latitude)&longitude=\(location.longitude)&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
+        let urlString = "https://api.open-meteo.com/v1/forecast?latitude=\(location.latitude)&longitude=\(location.longitude)&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max&hourly=temperature_2m,weather_code,precipitation_probability&forecast_days=7&timezone=auto"
 
         guard let url = URL(string: urlString) else {
             self.isLoading = false
@@ -116,16 +125,29 @@ public final class WeatherService: ObservableObject, WeatherServiceProtocol {
                 humidity: decoded.current.relative_humidity_2m
             )
 
+            // Parse Daily Forecast (Tomorrow + Upcoming 5 days)
+            let dailyItems = parseDailyForecast(from: decoded.daily)
+
+            // Parse Hourly Forecast (Next 12 hours)
+            let hourlyItems = parseHourlyForecast(from: decoded.hourly)
+
+            // Generate Smart Weather Advice (e.g. umbrella reminder, jacket, sunglasses)
+            let advice = generateAdvice(current: info, daily: dailyItems, hourly: hourlyItems)
+
             self.currentWeather = info
-            self.cache[location.id] = (info, Date())
+            self.dailyForecast = dailyItems
+            self.hourlyForecast = hourlyItems
+            self.weatherAdvice = advice
+
+            self.cache[location.id] = (info, dailyItems, hourlyItems, advice, Date())
             self.isLoading = false
         } catch {
             self.isLoading = false
             self.errorMessage = error.localizedDescription
 
-            // If network fails and no cached info, provide sensible default fallback
+            // Fallback for offline/error state
             if self.currentWeather == nil {
-                self.currentWeather = WeatherInfo(
+                let fallback = WeatherInfo(
                     locationName: location.name,
                     temperature: 21.0,
                     condition: "Clear",
@@ -134,8 +156,184 @@ public final class WeatherService: ObservableObject, WeatherServiceProtocol {
                     highTemp: 23.0,
                     lowTemp: 17.0
                 )
+                self.currentWeather = fallback
+                self.weatherAdvice = WeatherAdvice(
+                    title: "Pleasant Day",
+                    suggestion: "Mild and comfortable temperatures. Enjoy your day!",
+                    icon: "sun.max.fill",
+                    badge: "All Good"
+                )
             }
         }
+    }
+
+    private func parseDailyForecast(from daily: DailyWeatherDTO) -> [DayForecastItem] {
+        var items: [DayForecastItem] = []
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        let dayDisplayFormatter = DateFormatter()
+        dayDisplayFormatter.dateFormat = "EEE"
+
+        let count = min(daily.time.count, daily.weather_code.count, daily.temperature_2m_max.count, daily.temperature_2m_min.count)
+
+        for i in 0..<count {
+            guard let date = dateFormatter.date(from: daily.time[i]) else { continue }
+            let (cond, sym) = mapWeatherCode(daily.weather_code[i])
+            let maxT = daily.temperature_2m_max[i]
+            let minT = daily.temperature_2m_min[i]
+            let rainProb = (daily.precipitation_probability_max != nil && i < daily.precipitation_probability_max!.count)
+                ? daily.precipitation_probability_max![i]
+                : 0
+            let rainSum = (daily.precipitation_sum != nil && i < daily.precipitation_sum!.count)
+                ? daily.precipitation_sum![i]
+                : 0.0
+            let uv = (daily.uv_index_max != nil && i < daily.uv_index_max!.count)
+                ? daily.uv_index_max![i]
+                : nil
+
+            let isToday = Calendar.current.isDateInToday(date)
+            let isTomorrow = Calendar.current.isDateInTomorrow(date)
+            let dayName = isToday ? "Today" : (isTomorrow ? "Tomorrow" : dayDisplayFormatter.string(from: date))
+
+            items.append(DayForecastItem(
+                date: date,
+                dayName: dayName,
+                maxTemp: maxT,
+                minTemp: minT,
+                condition: cond,
+                symbolName: sym,
+                precipitationProbability: rainProb,
+                precipitationSum: rainSum,
+                uvIndex: uv
+            ))
+        }
+
+        return items
+    }
+
+    private func parseHourlyForecast(from hourly: HourlyWeatherDTO?) -> [HourlyForecastItem] {
+        guard let hourly = hourly else { return [] }
+        var items: [HourlyForecastItem] = []
+
+        let isoFormatter = DateFormatter()
+        isoFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+
+        let hourDisplayFormatter = DateFormatter()
+        hourDisplayFormatter.dateFormat = "ha"
+
+        let now = Date()
+        let count = min(hourly.time.count, hourly.temperature_2m.count, hourly.weather_code.count)
+
+        for i in 0..<count {
+            guard let date = isoFormatter.date(from: hourly.time[i]) else { continue }
+            // Only keep upcoming hours (from current hour up to 12 hours ahead)
+            if date.timeIntervalSince(now) >= -1800 && items.count < 12 {
+                let (cond, sym) = mapWeatherCode(hourly.weather_code[i])
+                let isCurrentHour = abs(date.timeIntervalSince(now)) < 1800
+                let label = isCurrentHour ? "Now" : hourDisplayFormatter.string(from: date).lowercased()
+                let rainProb = (hourly.precipitation_probability != nil && i < hourly.precipitation_probability!.count)
+                    ? hourly.precipitation_probability![i]
+                    : 0
+
+                items.append(HourlyForecastItem(
+                    time: date,
+                    timeLabel: label,
+                    temp: hourly.temperature_2m[i],
+                    condition: cond,
+                    symbolName: sym,
+                    precipitationProbability: rainProb
+                ))
+            }
+        }
+
+        return items
+    }
+
+    public func generateAdvice(current: WeatherInfo, daily: [DayForecastItem], hourly: [HourlyForecastItem] = []) -> WeatherAdvice {
+        let todayRainChance = daily.first(where: { $0.dayName == "Today" })?.precipitationProbability ?? 0
+        let tomorrowRainChance = daily.first(where: { $0.dayName == "Tomorrow" })?.precipitationProbability ?? 0
+        let currentCode = current.symbolName
+
+        // 1. Rain Alert: If rain is happening or chance is high today
+        if currentCode.contains("rain") || currentCode.contains("drizzle") || currentCode.contains("bolt") || todayRainChance >= 40 {
+            let pct = max(todayRainChance, 45)
+            return WeatherAdvice(
+                title: "Rain Expected",
+                suggestion: "Rain expected today (\(pct)% chance) — bring your umbrella with you!",
+                icon: "umbrella.fill",
+                badge: "Take Umbrella"
+            )
+        }
+
+        // 2. Tomorrow Rain Alert: If tomorrow will be rainy
+        if tomorrowRainChance >= 50 {
+            return WeatherAdvice(
+                title: "Rain Tomorrow",
+                suggestion: "Showers forecasted tomorrow (\(tomorrowRainChance)%) — keep an umbrella ready!",
+                icon: "cloud.rain.fill",
+                badge: "Rain Alert"
+            )
+        }
+
+        // 3. Freezing / Snow Alert
+        if current.temperature <= 0 || currentCode.contains("snow") {
+            return WeatherAdvice(
+                title: "Freezing Weather",
+                suggestion: "Sub-zero conditions outside — bundle up in heavy winter layers.",
+                icon: "snowflake",
+                badge: "Bundle Up"
+            )
+        }
+
+        // 4. Cold / Chilly Alert
+        if current.temperature <= 12 {
+            return WeatherAdvice(
+                title: "Chilly Temperatures",
+                suggestion: "Brisk cold air today — wear a warm jacket before heading out.",
+                icon: "thermometer.snowflake",
+                badge: "Wear Jacket"
+            )
+        }
+
+        // 5. Extreme Heat Alert
+        if current.temperature >= 30 {
+            return WeatherAdvice(
+                title: "Hot & Sunny",
+                suggestion: "High heat outside (\(Int(round(current.temperature)))°C) — stay well hydrated and apply sunscreen.",
+                icon: "sun.max.fill",
+                badge: "Stay Hydrated"
+            )
+        }
+
+        // 6. High UV / Sunny Alert
+        let uv = daily.first(where: { $0.dayName == "Today" })?.uvIndex ?? 0
+        if uv >= 6 || ((current.condition.contains("Clear") || current.condition.contains("Sunny")) && current.temperature >= 24) {
+            return WeatherAdvice(
+                title: "Sunny & High UV",
+                suggestion: "Bright skies and strong sunshine — don't forget sunglasses and sunscreen.",
+                icon: "sunglasses.fill",
+                badge: "Sunglasses"
+            )
+        }
+
+        // 6. Pleasant Weather
+        if current.temperature >= 18 && current.temperature <= 25 {
+            return WeatherAdvice(
+                title: "Great Weather",
+                suggestion: "Pleasant \(Int(round(current.temperature)))°C with clear air — great day for an outdoor break!",
+                icon: "figure.walk",
+                badge: "Pleasant Day"
+            )
+        }
+
+        // 7. Default Mild
+        return WeatherAdvice(
+            title: "Fair Weather",
+            suggestion: "\(current.condition) conditions throughout the day. Have a productive day!",
+            icon: "sparkles",
+            badge: "All Clear"
+        )
     }
 
     private func mapWeatherCode(_ code: Int) -> (condition: String, symbol: String) {
@@ -159,6 +357,7 @@ public final class WeatherService: ObservableObject, WeatherServiceProtocol {
 private struct OpenMeteoResponse: Decodable {
     let current: CurrentWeatherDTO
     let daily: DailyWeatherDTO
+    let hourly: HourlyWeatherDTO?
 }
 
 private struct CurrentWeatherDTO: Decodable {
@@ -169,8 +368,20 @@ private struct CurrentWeatherDTO: Decodable {
 }
 
 private struct DailyWeatherDTO: Decodable {
+    let time: [String]
+    let weather_code: [Int]
     let temperature_2m_max: [Double]
     let temperature_2m_min: [Double]
+    let precipitation_probability_max: [Int]?
+    let precipitation_sum: [Double]?
+    let uv_index_max: [Double]?
+}
+
+private struct HourlyWeatherDTO: Decodable {
+    let time: [String]
+    let temperature_2m: [Double]
+    let weather_code: [Int]
+    let precipitation_probability: [Int]?
 }
 
 private struct OpenMeteoGeocodingResponse: Decodable {

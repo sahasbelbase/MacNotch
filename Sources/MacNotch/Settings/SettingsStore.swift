@@ -36,6 +36,10 @@ public final class SettingsStore: ObservableObject {
     @AppStorage("selectedLocationCountry") public var selectedLocationCountry: String = "Nepal"
     @AppStorage("tempUnit") public var tempUnit: String = TemperatureUnit.celsius.rawValue
 
+    // MARK: - Google Calendar Sync Settings
+    @AppStorage("googleCalendarICalURL") public var googleCalendarICalURL: String = ""
+    @AppStorage("googleCalendarEnabled") public var googleCalendarEnabled: Bool = true
+
     public var currentWeatherLocation: WeatherLocation {
         get {
             WeatherLocation(

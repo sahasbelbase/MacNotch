@@ -26,7 +26,7 @@ Ready-to-use release disk images are available directly in this repository:
 3. Launch `MacNotch` from Applications or Spotlight.
 4. Move your mouse to the top center of your screen (over the camera notch) to activate.
 
-> **Note on Permissions**: For Screenshot Studio and Screen Text OCR, grant Screen Recording permission in **System Settings → Privacy & Security → Screen Recording**. MacNotch uses stable bundle-identifier code signing (`-r='designated => identifier "com.sahasbelbase.MacNotch"'`) to ensure permissions persist across launches and updates.
+> **Note on Permissions**: For Screenshot Studio and Screen Text OCR, grant Screen Recording permission in **System Settings → Privacy & Security → Screen Recording**. MacNotch uses stable bundle-identifier code signing (`-r='designated => identifier "com.user.MacNotch"'`) to ensure permissions persist across launches and updates.
 
 ---
 
@@ -61,7 +61,10 @@ Ready-to-use release disk images are available directly in this repository:
 ### ⏱️ Focus Timer & Calendar Event Hub
 - **Focus / Pomodoro Timer**: Preset durations (15m, 25m, 45m, 60m) with customized chime upon completion.
 - **Live Collapsed Pill**: While a timer is active, an orange countdown pill stays visible in the collapsed notch so you can track time at a glance.
-- **Today's Calendar**: Syncs with EventKit to display your upcoming schedule and meetings.
+- **Interactive Calendar & Meeting Hub**: Full monthly calendar view, today's schedule, and 1-click Google Meet / Zoom video call launcher.
+- **Google Calendar Account Sync**:
+  - **Native macOS Sync (Recommended)**: Seamlessly integrates with Google accounts added in System Settings → Internet Accounts.
+  - **Direct Secret iCal Feed**: Paste your Google Calendar secret iCal URL (`.ics`) for instant schedule syncing without requiring full system account access.
 
 ### 🛠️ Power Tools Suite
 - **Screenshot Studio**: Capture full screen, selected window, or custom rectangle directly to clipboard and disk in high-DPI quality.
@@ -69,10 +72,12 @@ Ready-to-use release disk images are available directly in this repository:
 - **QR Code Generator**: On-the-fly QR code generator for URLs or text snippets (clean, empty-by-default design).
 - **Screen Recorder & Camera Mirror**: Quick shortcuts for macOS recording and low-latency camera HUD preview.
 
-### ☀️ Weather Engine
-- Real-time meteorological forecast with current temperature, condition icon, feels-like, and daily highs/lows.
-- Interactive city search supporting global locations (Kathmandu, London, Tokyo, New York, etc.).
-- Instant **°C / °F** unit toggle with immediate UI refresh and preference persistence.
+### ☀️ Weather Engine & Smart Contextual Advice
+- **Live Meteorological Dashboard**: Real-time conditions, feels-like temperature, humidity percentage, and daily highs/lows.
+- **Smart Contextual Advice Box**: Intelligent situational reminders (e.g., *"Bring your umbrella with you"* when rain or drizzle is forecasted today or tomorrow, jacket alerts for cold weather, hydration tips for heat).
+- **Hourly Forecast Strip**: Visual 12-hour glance showing temperature progression, weather icons, and rain probabilities.
+- **Multi-Day Extended Forecast**: Upcoming 5-day daily forecast with high/low temperature ranges and conditions.
+- **Interactive City Switcher**: Global presets (Kathmandu, Cupertino, New York, London, Tokyo) plus instant **°C / °F** unit toggling with live recalculation and preference persistence.
 
 ### 🔆 Hardware Dynamic Controls
 - Integrated screen brightness slider and audio volume control.

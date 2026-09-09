@@ -84,7 +84,7 @@ final class AdvancedFeaturesTests: XCTestCase {
     @MainActor
     func testBluetoothAccessoryIconResolution() {
         let service = BluetoothAccessoryService()
-        XCTAssertEqual(service.resolveAccessoryIcon(name: "Sahas's AirPods Max"), "airpodsmax")
+        XCTAssertEqual(service.resolveAccessoryIcon(name: "User's AirPods Max"), "airpodsmax")
         XCTAssertEqual(service.resolveAccessoryIcon(name: "AirPods Pro - Left"), "airpodspro")
         XCTAssertEqual(service.resolveAccessoryIcon(name: "AirPods 3"), "airpods")
         XCTAssertEqual(service.resolveAccessoryIcon(name: "Beats Studio Pro"), "beats.headphones")

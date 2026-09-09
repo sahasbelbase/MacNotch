@@ -397,7 +397,7 @@ final class ClipboardManagerTests: XCTestCase {
 
     // MARK: - 24. Intelligent Preview JSON Formatting
     func testIntelligentPreviewJSON() {
-        let jsonString = "{\"user\":\"Sahas\",\"role\":\"Developer\",\"active\":true}"
+        let jsonString = "{\"user\":\"User\",\"role\":\"Developer\",\"active\":true}"
         let preview = ClipboardPreviewProvider.shared.generatePreview(for: jsonString, type: .text)
 
         XCTAssertTrue(preview.contains("{\n"))

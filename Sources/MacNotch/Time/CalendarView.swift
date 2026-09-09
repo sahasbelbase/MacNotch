@@ -2,13 +2,15 @@ import SwiftUI
 import AppKit
 
 /// Dedicated native macOS Calendar interface showing interactive monthly calendar,
-/// today highlights, weekday grid, and agenda schedule.
+/// today highlights, weekday grid, agenda schedule, and Google Calendar sync.
 public struct CalendarView: View {
     @ObservedObject var timeService: TimeService
     @ObservedObject var calendarSyncService: CalendarSyncService
     @ObservedObject var timerService: TimerService
     @State private var displayedMonthOffset: Int = 0
     @State private var selectedDate: Date?
+    @State private var showGoogleSyncSheet: Bool = false
+    @State private var iCalURLInput: String = SettingsStore.shared.googleCalendarICalURL
 
     public init(
         timeService: TimeService,
@@ -120,7 +122,7 @@ public struct CalendarView: View {
             .macNotchCardStyle()
             .frame(maxWidth: 300)
 
-            // Right Column: Agenda, Meeting Glancer, & Focus Timer
+            // Right Column: Agenda, Meeting Glancer, Google Sync & Focus Timer
             VStack(alignment: .leading, spacing: 8) {
                 // Today Banner
                 HStack {
@@ -142,32 +144,55 @@ public struct CalendarView: View {
                 Divider()
                     .background(DesignSystem.Colors.subtleBorder)
 
-                // Agenda Highlights / Meeting Glancer
+                // Agenda Highlights / Meeting Glancer & Google Sync Status
                 agendaSectionView
+
+                if showGoogleSyncSheet {
+                    googleSyncConfigurationCardView
+                }
 
                 // Embedded Focus & Pomodoro Timer
                 TimerWidgetView(timerService: timerService, isCompact: false)
 
                 Spacer(minLength: 0)
 
-                // Launch Calendar App Button
-                Button(action: openSystemCalendar) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "calendar.badge.plus")
-                            .font(.system(size: 10))
-                        Text("Open macOS Calendar")
-                            .font(.system(size: 10, weight: .medium))
-                        Spacer()
-                        Image(systemName: "arrow.up.forward.app")
-                            .font(.system(size: 9))
+                // Bottom Utilities Bar: Google Calendar Quick Access & macOS Calendar
+                HStack(spacing: 8) {
+                    Button(action: { calendarSyncService.openGoogleCalendarWeb() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "globe")
+                                .font(.system(size: 9))
+                            Text("Google Calendar")
+                                .font(.system(size: 9, weight: .medium))
+                        }
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(6)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.06))
-                    .cornerRadius(6)
-                    .foregroundColor(DesignSystem.Colors.textSecondary)
+                    .buttonStyle(.plain)
+                    .help("Open Google Calendar in Browser")
+
+                    Spacer()
+
+                    Button(action: openSystemCalendar) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "calendar.badge.plus")
+                                .font(.system(size: 9))
+                            Text("Open macOS Calendar")
+                                .font(.system(size: 9, weight: .medium))
+                            Image(systemName: "arrow.up.forward.app")
+                                .font(.system(size: 8))
+                        }
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(6)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .padding(10)
             .macNotchCardStyle()
@@ -180,36 +205,77 @@ public struct CalendarView: View {
     @ViewBuilder
     private var agendaSectionView: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
+            HStack(alignment: .center) {
                 Text("Schedule")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(DesignSystem.Colors.textSecondary)
 
                 Spacer()
 
-                if calendarSyncService.hasPermission {
+                // Google Sync Indicator Badge / Button
+                if calendarSyncService.isGoogleSyncActive {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 5, height: 5)
+
+                        Text("Google Synced")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(Color.green)
+
+                        Button(action: { withAnimation { showGoogleSyncSheet.toggle() } }) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 7))
+                                .foregroundColor(DesignSystem.Colors.textTertiary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.green.opacity(0.12))
+                    .clipShape(Capsule())
+                    .help(calendarSyncService.detectedGoogleAccount ?? "Google Calendar Active")
+                } else {
+                    Button(action: { withAnimation { showGoogleSyncSheet.toggle() } }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "link.badge.plus")
+                                .font(.system(size: 8))
+                            Text("Sync Google")
+                                .font(.system(size: 8, weight: .bold))
+                        }
+                        .foregroundColor(.accentColor)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Connect your Google Calendar account")
+                }
+
+                if calendarSyncService.hasPermission || calendarSyncService.isGoogleSyncActive {
                     Button(action: { calendarSyncService.fetchUpcomingEvents() }) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 9))
                             .foregroundColor(DesignSystem.Colors.textTertiary)
                     }
                     .buttonStyle(.plain)
-                    .help("Refresh Calendar")
+                    .help("Refresh Meetings")
                 }
             }
 
-            if !calendarSyncService.hasPermission {
-                // Permission Request Banner
+            if !calendarSyncService.hasPermission && !calendarSyncService.isGoogleSyncActive {
+                // Permission & Google Sync Request Banner
                 HStack(spacing: 8) {
                     Image(systemName: "calendar.badge.exclamationmark")
                         .font(.system(size: 14))
                         .foregroundColor(.yellow)
 
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Sync macOS Calendar")
+                        Text("Connect Your Calendar")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(DesignSystem.Colors.textPrimary)
-                        Text("Enable access to show meetings & video links")
+                        Text("Sync macOS Calendar or Google account for meeting alerts")
                             .font(.system(size: 9))
                             .foregroundColor(DesignSystem.Colors.textTertiary)
                     }
@@ -241,7 +307,7 @@ public struct CalendarView: View {
                         Text("All clear today")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(DesignSystem.Colors.textPrimary)
-                        Text("No pending meetings or conflicts")
+                        Text(calendarSyncService.isGoogleSyncActive ? "Google Calendar synced • No pending meetings" : "No pending meetings or conflicts")
                             .font(.system(size: 9))
                             .foregroundColor(DesignSystem.Colors.textTertiary)
                     }
@@ -261,10 +327,22 @@ public struct CalendarView: View {
                                 .frame(width: 3, height: 28)
 
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(meeting.title)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(DesignSystem.Colors.textPrimary)
-                                    .lineLimit(1)
+                                HStack(spacing: 4) {
+                                    Text(meeting.title)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                                        .lineLimit(1)
+
+                                    if meeting.isGoogleCalendar {
+                                        Text("GOOGLE")
+                                            .font(.system(size: 7, weight: .heavy))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 3)
+                                            .padding(.vertical, 0.5)
+                                            .background(Color.blue.opacity(0.8))
+                                            .clipShape(Capsule())
+                                    }
+                                }
 
                                 Text(meeting.formattedRelativeTime)
                                     .font(.system(size: 9, weight: .semibold))
@@ -276,19 +354,19 @@ public struct CalendarView: View {
                             if let meetingURL = meeting.meetingURL {
                                 Button(action: { calendarSyncService.joinMeeting(url: meetingURL) }) {
                                     HStack(spacing: 3) {
-                                        Image(systemName: "video.fill")
+                                        Image(systemName: meeting.isGoogleMeet ? "video.bubble.fill" : "video.fill")
                                             .font(.system(size: 9))
-                                        Text("Join")
+                                        Text(meeting.isGoogleMeet ? "Meet" : "Join")
                                             .font(.system(size: 10, weight: .bold))
                                     }
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3.5)
-                                    .background(Color.green.opacity(0.85))
+                                    .background(meeting.isGoogleMeet ? Color.blue.opacity(0.9) : Color.green.opacity(0.85))
                                     .clipShape(Capsule())
                                 }
                                 .buttonStyle(.plain)
-                                .help("Join \(meetingURL.host ?? "Call")")
+                                .help("Join \(meeting.isGoogleMeet ? "Google Meet" : (meetingURL.host ?? "Call"))")
                             }
                         }
                         .padding(6)
@@ -297,6 +375,119 @@ public struct CalendarView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Google Calendar Sync Configuration Drawer
+    private var googleSyncConfigurationCardView: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            googleSyncHeaderView
+            googleInternetAccountsRow
+            googleICalInputRow
+        }
+        .padding(8)
+        .background(Color.accentColor.opacity(0.08))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.accentColor.opacity(0.25), lineWidth: 1)
+        )
+    }
+
+    private var googleSyncHeaderView: some View {
+        HStack {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.accentColor)
+
+            Text("Sync Google Calendar Account")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(DesignSystem.Colors.textPrimary)
+
+            Spacer()
+
+            Button(action: { withAnimation { showGoogleSyncSheet = false } }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 11))
+                    .foregroundColor(DesignSystem.Colors.textTertiary)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var googleInternetAccountsRow: some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Option A: Connect via macOS (Recommended)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                Text("Add Google account in macOS System Settings for automatic zero-config sync.")
+                    .font(.system(size: 8))
+                    .foregroundColor(DesignSystem.Colors.textTertiary)
+            }
+
+            Spacer()
+
+            Button(action: { calendarSyncService.openGoogleInternetAccountsSettings() }) {
+                Text("System Settings")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color.accentColor)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(6)
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(6)
+    }
+
+    private var googleICalInputRow: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Option B: Paste Secret iCal Feed URL")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(DesignSystem.Colors.textPrimary)
+
+            HStack(spacing: 4) {
+                TextField("https://calendar.google.com/calendar/ical/.../basic.ics", text: $iCalURLInput)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 9))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3.5)
+                    .background(Color.black.opacity(0.2))
+                    .cornerRadius(4)
+                    .foregroundColor(DesignSystem.Colors.textPrimary)
+
+                Button(action: saveAndSyncGoogleICal) {
+                    Text(calendarSyncService.isSyncingGoogleICal ? "Syncing..." : "Save & Sync")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3.5)
+                        .background(Color.accentColor)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(calendarSyncService.isSyncingGoogleICal)
+            }
+
+            Text("In Google Calendar on web → Settings → Your Calendar → Copy 'Secret address in iCal format'")
+                .font(.system(size: 7.5))
+                .foregroundColor(DesignSystem.Colors.textTertiary)
+        }
+        .padding(6)
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(6)
+    }
+
+    private func saveAndSyncGoogleICal() {
+        SettingsStore.shared.googleCalendarICalURL = iCalURLInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        SettingsStore.shared.googleCalendarEnabled = true
+        calendarSyncService.fetchUpcomingEvents()
+        withAnimation {
+            showGoogleSyncSheet = false
         }
     }
 
