@@ -72,7 +72,7 @@ public struct MusicView: View {
                         .truncationMode(.tail)
 
                     if let player = nowPlayingService.activePlayerName {
-                        Button(action: { openMusicStudio() }) {
+                        Button(action: { openActivePlayer() }) {
                             Text(player)
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(.accentColor)
@@ -299,7 +299,7 @@ public struct MusicView: View {
     @ViewBuilder
     private func coverArtButton(size: CGFloat, cornerRadius: CGFloat) -> some View {
         Button(action: {
-            openMusicStudio()
+            openActivePlayer()
         }) {
             ZStack {
                 if let artwork = nowPlayingService.artwork {
@@ -332,11 +332,11 @@ public struct MusicView: View {
         }
         .buttonStyle(.plain)
         .pointingHandCursor()
-        .help("Click cover artwork to open Music Studio")
+        .help("Click cover artwork to open \(nowPlayingService.activePlayerName ?? "Music Player")")
     }
 
-    /// Brings Music Studio to foreground or launches it if closed.
-    private func openMusicStudio() {
-        nowPlayingService.musicStudioProvider.bringMusicStudioToFront()
+    /// Brings the active audio player (Music Studio, Spotify, Apple Music) to foreground.
+    private func openActivePlayer() {
+        nowPlayingService.openActivePlayer()
     }
 }

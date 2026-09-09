@@ -253,12 +253,19 @@ public struct ExpandedNotchView: View {
     }
 
     @State private var overviewLowerMode: OverviewLowerMode = .musicStudio
+    @State private var hasAutoSelectedMode: Bool = false
 
     // MARK: - Overview Hierarchy View (Music as Main Hero, Music Studio List & Clips Below)
     private var overviewHierarchyView: some View {
         let settings = SettingsStore.shared
         let trackCount = nowPlayingService.musicStudioProvider.libraryTracks.count
         let clipCount = clipboardManager.items.count
+
+        // Smart Lower Mode: if user hasn't explicitly clicked a tab, default to Recent Clips if Music Studio has 0 tracks!
+        let effectiveMode: OverviewLowerMode = {
+            if hasAutoSelectedMode { return overviewLowerMode }
+            return trackCount > 0 ? .musicStudio : .clipboard
+        }()
 
         return VStack(spacing: 6) {
             // Section 1: Prominent Music Hero Card
@@ -270,6 +277,7 @@ public struct ExpandedNotchView: View {
                     isHero: true,
                     onOpenLibrary: {
                         withAnimation(DesignSystem.Animation.tabSwitch) {
+                            hasAutoSelectedMode = true
                             overviewLowerMode = .musicStudio
                         }
                     }
@@ -280,6 +288,7 @@ public struct ExpandedNotchView: View {
             HStack(spacing: 6) {
                 Button(action: {
                     withAnimation(DesignSystem.Animation.tabSwitch) {
+                        hasAutoSelectedMode = true
                         overviewLowerMode = .musicStudio
                     }
                 }) {
@@ -292,15 +301,16 @@ public struct ExpandedNotchView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 3.5)
                     .background(
-                        Capsule().fill(overviewLowerMode == .musicStudio ? Color.accentColor.opacity(0.2) : Color.white.opacity(0.06))
+                        Capsule().fill(effectiveMode == .musicStudio ? Color.accentColor.opacity(0.2) : Color.white.opacity(0.06))
                     )
-                    .foregroundColor(overviewLowerMode == .musicStudio ? .accentColor : DesignSystem.Colors.textSecondary)
+                    .foregroundColor(effectiveMode == .musicStudio ? .accentColor : DesignSystem.Colors.textSecondary)
                 }
                 .buttonStyle(.plain)
 
                 if settings.showOverviewClipboard {
                     Button(action: {
                         withAnimation(DesignSystem.Animation.tabSwitch) {
+                            hasAutoSelectedMode = true
                             overviewLowerMode = .clipboard
                         }
                     }) {
@@ -313,9 +323,9 @@ public struct ExpandedNotchView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 3.5)
                         .background(
-                            Capsule().fill(overviewLowerMode == .clipboard ? Color.accentColor.opacity(0.2) : Color.white.opacity(0.06))
+                            Capsule().fill(effectiveMode == .clipboard ? Color.accentColor.opacity(0.2) : Color.white.opacity(0.06))
                         )
-                        .foregroundColor(overviewLowerMode == .clipboard ? .accentColor : DesignSystem.Colors.textSecondary)
+                        .foregroundColor(effectiveMode == .clipboard ? .accentColor : DesignSystem.Colors.textSecondary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -326,7 +336,7 @@ public struct ExpandedNotchView: View {
 
             // Section 2: Lower Content (Music Studio Song List or Clipboard Carousel)
             Group {
-                if overviewLowerMode == .musicStudio {
+                if effectiveMode == .musicStudio {
                     MusicStudioListView(musicStudioProvider: nowPlayingService.musicStudioProvider)
                 } else if settings.showOverviewClipboard {
                     ClipboardView(clipboardManager: clipboardManager)

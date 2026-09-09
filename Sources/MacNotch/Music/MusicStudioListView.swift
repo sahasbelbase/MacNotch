@@ -411,9 +411,20 @@ public struct MusicStudioListView: View {
                     Image(systemName: "music.note.list")
                         .font(.system(size: 24))
                         .foregroundColor(DesignSystem.Colors.textTertiary)
-                    Text(searchText.isEmpty ? "Loading Music Studio tracks..." : "No matching local tracks")
-                        .font(.system(size: 11))
-                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                    if musicStudioProvider.isAvailable {
+                        Text(searchText.isEmpty ? "No tracks in Music Studio library" : "No matching local tracks")
+                            .font(.system(size: 11))
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
+                    } else {
+                        Text("Music Studio Not Running")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(DesignSystem.Colors.textPrimary)
+                        Text("Smart Audio active: playing via Spotify, Apple Music, or system media.")
+                            .font(.system(size: 10))
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                    }
                     Spacer()
                 }
             } else {

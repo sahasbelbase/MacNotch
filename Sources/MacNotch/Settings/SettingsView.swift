@@ -118,18 +118,63 @@ public struct SettingsView: View {
 
             Section("Music Player Integration") {
                 Picker("Preferred Audio Source", selection: $settings.musicSource) {
-                    Text("Automatic (Music Studio / MediaRemote)").tag("Auto")
-                    Text("Music Studio (Local Server :5050)").tag("MusicStudio")
-                    Text("Apple Music").tag("Music")
-                    Text("Spotify").tag("Spotify")
+                    Text("Automatic (Smart Fallback)").tag("Auto")
+                    Text("Music Studio \(isMusicStudioDownloaded ? "✓" : "(Not Downloaded)")").tag("MusicStudio")
+                    Text("Spotify \(isSpotifyDownloaded ? "✓" : "(Not Downloaded)")").tag("Spotify")
+                    Text("YouTube Music \(isYouTubeMusicDownloaded ? "✓" : "(Web Streaming)")").tag("YouTubeMusic")
+                    Text("Apple Music ✓").tag("Music")
                 }
 
-                Text("Music Studio is automatically detected at http://127.0.0.1:5050 when running.")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Smart Fallback Priority: Music Studio → Spotify → YouTube Music → Apple Music")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.primary)
+
+                    HStack(spacing: 10) {
+                        playerStatusPill(name: "Music Studio", isInstalled: isMusicStudioDownloaded)
+                        playerStatusPill(name: "Spotify", isInstalled: isSpotifyDownloaded)
+                        playerStatusPill(name: "Apple Music", isInstalled: isAppleMusicDownloaded)
+                        playerStatusPill(name: "YouTube Music", isInstalled: isYouTubeMusicDownloaded)
+                    }
+                    .padding(.top, 2)
+                }
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var isMusicStudioDownloaded: Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.musicstudio.app") != nil
+            || FileManager.default.fileExists(atPath: "/Applications/Music Studio.app")
+            || FileManager.default.fileExists(atPath: ("~/Applications/Music Studio.app" as NSString).expandingTildeInPath)
+    }
+
+    private var isSpotifyDownloaded: Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.spotify.client") != nil
+            || FileManager.default.fileExists(atPath: "/Applications/Spotify.app")
+            || FileManager.default.fileExists(atPath: ("~/Applications/Spotify.app" as NSString).expandingTildeInPath)
+    }
+
+    private var isAppleMusicDownloaded: Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Music") != nil
+            || FileManager.default.fileExists(atPath: "/System/Applications/Music.app")
+    }
+
+    private var isYouTubeMusicDownloaded: Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.github.th-ch.youtube-music") != nil
+            || NSWorkspace.shared.urlForApplication(withBundleIdentifier: "app.ytmdesktop.ytmdesktop") != nil
+            || FileManager.default.fileExists(atPath: "/Applications/YouTube Music.app")
+    }
+
+    private func playerStatusPill(name: String, isInstalled: Bool) -> some View {
+        HStack(spacing: 3) {
+            Circle()
+                .fill(isInstalled ? Color.green : Color.orange.opacity(0.8))
+                .frame(width: 6, height: 6)
+            Text("\(name): \(isInstalled ? "Ready" : "Not Found")")
+                .font(.system(size: 9))
+                .foregroundColor(.secondary)
+        }
     }
 
     // MARK: - Clipboard Tab

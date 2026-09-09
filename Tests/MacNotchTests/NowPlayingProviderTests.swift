@@ -208,4 +208,33 @@ final class NowPlayingProviderTests: XCTestCase {
         let fakeResult = await provider.deleteTrack(fakeTrack)
         XCTAssertFalse(fakeResult, "Deleting a nonexistent file should return false")
     }
+
+    @MainActor
+    func testActiveAudioPlayerEnumProperties() {
+        XCTAssertEqual(ActiveAudioPlayer.musicStudio.rawValue, "Music Studio")
+        XCTAssertEqual(ActiveAudioPlayer.spotify.rawValue, "Spotify")
+        XCTAssertEqual(ActiveAudioPlayer.appleMusic.rawValue, "Apple Music")
+        XCTAssertEqual(ActiveAudioPlayer.youtubeMusic.rawValue, "YouTube Music")
+        XCTAssertEqual(ActiveAudioPlayer.mediaRemote.rawValue, "Media Player")
+    }
+
+    @MainActor
+    func testSystemNowPlayingServiceDetection() {
+        let service = SystemNowPlayingService()
+        // Detection properties should be boolean and should evaluate without crashing or throwing
+        _ = service.isMusicStudioDownloaded
+        _ = service.isSpotifyDownloaded
+        _ = service.isAppleMusicDownloaded
+        _ = service.isYouTubeMusicDownloaded
+
+        _ = service.isMusicStudioRunning
+        _ = service.isSpotifyRunning
+        _ = service.isAppleMusicRunning
+        _ = service.isYouTubeMusicRunning
+
+        // Active player should always resolve to a valid ActiveAudioPlayer enum
+        XCTAssertNotNil(service.activePlayer)
+        XCTAssertFalse(service.activePlayer.rawValue.isEmpty)
+    }
 }
+
