@@ -152,4 +152,34 @@ final class HardwareDynamicsTests: XCTestCase {
         // Restore initial keyboard brightness
         service.setKeyboardBrightness(initialKeyboard)
     }
+
+    func testHUDAutoDismissalAndDeduplication() async throws {
+        let appState = AppState()
+        let musicHUD = TransientHUD.music(title: "Mask Off", artist: "Future")
+
+        // Trigger HUD for 0.1 seconds
+        appState.showHUD(musicHUD, duration: 0.1)
+        XCTAssertEqual(appState.activeHUD, musicHUD)
+
+        // Calling showHUD with the exact same HUD should NOT cancel or extend the dismissal timer
+        appState.showHUD(musicHUD, duration: 0.1)
+        XCTAssertEqual(appState.activeHUD, musicHUD)
+
+        // Wait for dismissal (0.15s)
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertNil(appState.activeHUD, "HUD should automatically collapse to nil after the duration elapses")
+    }
+
+    func testHUDDismissalOnExpand() {
+        let appState = AppState()
+        let musicHUD = TransientHUD.music(title: "Mask Off", artist: "Future")
+
+        appState.showHUD(musicHUD, duration: 2.0)
+        XCTAssertEqual(appState.activeHUD, musicHUD)
+
+        // Transitioning to expanded should immediately dismiss active HUD
+        appState.transition(to: .activating)
+        appState.transition(to: .expanded)
+        XCTAssertNil(appState.activeHUD)
+    }
 }

@@ -87,6 +87,12 @@ public final class AppState: ObservableObject {
         guard isEnabled else { return }
         guard currentState != .expanded else { return }
 
+        // If the exact same HUD is already actively showing and counting down,
+        // do not reset the dismiss countdown to prevent staying permanently open on repeated status updates.
+        if activeHUD == hud, hudDismissTask != nil {
+            return
+        }
+
         activeHUD = hud
         hudDismissTask?.cancel()
         hudDismissTask = Task { @MainActor [weak self] in
@@ -123,6 +129,7 @@ public final class AppState: ObservableObject {
         case (.activating, .expanded):
             cancelActivationTask()
             currentState = .expanded
+            dismissHUD()
 
         case (.activating, .collapsed):
             cancelActivationTask()

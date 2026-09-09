@@ -12,7 +12,7 @@ public struct Track: Equatable, Sendable {
     public let playerPosition: TimeInterval?
 
     public init(
-        id: String = UUID().uuidString,
+        id: String? = nil,
         title: String,
         artist: String,
         album: String = "",
@@ -20,13 +20,19 @@ public struct Track: Equatable, Sendable {
         duration: TimeInterval? = nil,
         playerPosition: TimeInterval? = nil
     ) {
-        self.id = id
+        self.id = id ?? "\(artist)::\(title)::\(album)"
         self.title = title
         self.artist = artist
         self.album = album
         self.artworkData = artworkData
         self.duration = duration
         self.playerPosition = playerPosition
+    }
+
+    public static func == (lhs: Track, rhs: Track) -> Bool {
+        lhs.title == rhs.title &&
+        lhs.artist == rhs.artist &&
+        lhs.album == rhs.album
     }
 
     public var artworkImage: NSImage? {

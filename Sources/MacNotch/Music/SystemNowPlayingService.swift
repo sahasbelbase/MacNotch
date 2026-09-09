@@ -382,43 +382,73 @@ public final class SystemNowPlayingService: ObservableObject, NowPlayingServiceP
     }
 
     private func selectMusicStudio(playing: Bool? = nil) {
-        self.activePlayer = .musicStudio
-        self.activePlayerName = "Music Studio"
-        self.currentTrack = musicStudioProvider.currentTrack
-        self.isPlaying = playing ?? musicStudioProvider.isPlaying
-        self.artwork = musicStudioProvider.artwork
+        let newPlayer: ActiveAudioPlayer = .musicStudio
+        let newName = "Music Studio"
+        let newTrack = musicStudioProvider.currentTrack
+        let newPlaying = playing ?? musicStudioProvider.isPlaying
+        let newArtwork = musicStudioProvider.artwork
+
+        if self.activePlayer != newPlayer { self.activePlayer = newPlayer }
+        if self.activePlayerName != newName { self.activePlayerName = newName }
+        if self.currentTrack != newTrack { self.currentTrack = newTrack }
+        if self.isPlaying != newPlaying { self.isPlaying = newPlaying }
+        if self.artwork != newArtwork { self.artwork = newArtwork }
     }
 
     private func selectSpotify(playing: Bool? = nil) {
-        self.activePlayer = .spotify
-        self.activePlayerName = "Spotify"
-        self.isPlaying = playing ?? (spotifyIsPlaying || mediaRemoteProvider.isPlaying)
-        self.currentTrack = spotifyTrack ?? mediaRemoteProvider.currentTrack
-        self.artwork = mediaRemoteProvider.artwork
+        let newPlayer: ActiveAudioPlayer = .spotify
+        let newName = "Spotify"
+        let newTrack = spotifyTrack ?? mediaRemoteProvider.currentTrack
+        let newPlaying = playing ?? (spotifyIsPlaying || mediaRemoteProvider.isPlaying)
+        let newArtwork = mediaRemoteProvider.artwork
+
+        if self.activePlayer != newPlayer { self.activePlayer = newPlayer }
+        if self.activePlayerName != newName { self.activePlayerName = newName }
+        if self.currentTrack != newTrack { self.currentTrack = newTrack }
+        if self.isPlaying != newPlaying { self.isPlaying = newPlaying }
+        if self.artwork != newArtwork { self.artwork = newArtwork }
     }
 
     private func selectAppleMusic(playing: Bool? = nil) {
-        self.activePlayer = .appleMusic
-        self.activePlayerName = "Apple Music"
-        self.isPlaying = playing ?? (appleMusicIsPlaying || mediaRemoteProvider.isPlaying)
-        self.currentTrack = appleMusicTrack ?? mediaRemoteProvider.currentTrack
-        self.artwork = mediaRemoteProvider.artwork
+        let newPlayer: ActiveAudioPlayer = .appleMusic
+        let newName = "Apple Music"
+        let newTrack = appleMusicTrack ?? mediaRemoteProvider.currentTrack
+        let newPlaying = playing ?? (appleMusicIsPlaying || mediaRemoteProvider.isPlaying)
+        let newArtwork = mediaRemoteProvider.artwork
+
+        if self.activePlayer != newPlayer { self.activePlayer = newPlayer }
+        if self.activePlayerName != newName { self.activePlayerName = newName }
+        if self.currentTrack != newTrack { self.currentTrack = newTrack }
+        if self.isPlaying != newPlaying { self.isPlaying = newPlaying }
+        if self.artwork != newArtwork { self.artwork = newArtwork }
     }
 
     private func selectYouTubeMusic(playing: Bool? = nil) {
-        self.activePlayer = .youtubeMusic
-        self.activePlayerName = "YouTube Music"
-        self.isPlaying = playing ?? mediaRemoteProvider.isPlaying
-        self.currentTrack = mediaRemoteProvider.currentTrack
-        self.artwork = mediaRemoteProvider.artwork
+        let newPlayer: ActiveAudioPlayer = .youtubeMusic
+        let newName = "YouTube Music"
+        let newTrack = mediaRemoteProvider.currentTrack
+        let newPlaying = playing ?? mediaRemoteProvider.isPlaying
+        let newArtwork = mediaRemoteProvider.artwork
+
+        if self.activePlayer != newPlayer { self.activePlayer = newPlayer }
+        if self.activePlayerName != newName { self.activePlayerName = newName }
+        if self.currentTrack != newTrack { self.currentTrack = newTrack }
+        if self.isPlaying != newPlaying { self.isPlaying = newPlaying }
+        if self.artwork != newArtwork { self.artwork = newArtwork }
     }
 
     private func selectMediaRemote(playing: Bool? = nil) {
-        self.activePlayer = .mediaRemote
-        self.activePlayerName = "Media Player"
-        self.isPlaying = playing ?? mediaRemoteProvider.isPlaying
-        self.currentTrack = mediaRemoteProvider.currentTrack
-        self.artwork = mediaRemoteProvider.artwork
+        let newPlayer: ActiveAudioPlayer = .mediaRemote
+        let newName = "Media Player"
+        let newTrack = mediaRemoteProvider.currentTrack
+        let newPlaying = playing ?? mediaRemoteProvider.isPlaying
+        let newArtwork = mediaRemoteProvider.artwork
+
+        if self.activePlayer != newPlayer { self.activePlayer = newPlayer }
+        if self.activePlayerName != newName { self.activePlayerName = newName }
+        if self.currentTrack != newTrack { self.currentTrack = newTrack }
+        if self.isPlaying != newPlaying { self.isPlaying = newPlaying }
+        if self.artwork != newArtwork { self.artwork = newArtwork }
     }
 
     // MARK: - Open Active Player

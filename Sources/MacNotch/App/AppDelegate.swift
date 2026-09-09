@@ -100,14 +100,20 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // Wire Now Playing playback start and track change to a 2-second glimpse in Notch
-        var lastNotifiedTrackTitle: String = ""
-        var lastNotifiedTrackArtist: String = ""
+        var lastNotifiedTrackKey: String? = nil
 
         let triggerMusicGlimpse: (Track) -> Void = { [weak self] track in
             guard let self = self else { return }
             guard self.nowPlayingService.isPlaying, !track.title.isEmpty else { return }
-            lastNotifiedTrackTitle = track.title
-            lastNotifiedTrackArtist = track.artist
+
+            let cleanTitle = track.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let cleanArtist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let trackKey = "\(cleanTitle)::\(cleanArtist)"
+
+            // Guard against repeated triggers for the currently playing track
+            guard trackKey != lastNotifiedTrackKey else { return }
+            lastNotifiedTrackKey = trackKey
+
             self.appState.showHUD(
                 .music(
                     title: track.title,
@@ -118,6 +124,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         self.nowPlayingService.$isPlaying
+            .removeDuplicates()
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] isPlaying in
@@ -135,6 +142,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
 
         self.nowPlayingService.$currentTrack
+            .removeDuplicates()
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] track in
@@ -142,9 +150,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                       self.nowPlayingService.isPlaying,
                       let track = track,
                       !track.title.isEmpty else { return }
-                if track.title != lastNotifiedTrackTitle || track.artist != lastNotifiedTrackArtist {
-                    triggerMusicGlimpse(track)
-                }
+                triggerMusicGlimpse(track)
             }
             .store(in: &cancellables)
 
