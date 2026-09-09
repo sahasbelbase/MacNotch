@@ -9,7 +9,12 @@ public struct ExpandedNotchView: View {
     @ObservedObject var timeService: TimeService
     @ObservedObject var weatherService: WeatherService
     @ObservedObject var nowPlayingService: SystemNowPlayingService
+    @ObservedObject var fileShelfManager: FileShelfManager
+    @ObservedObject var jotterManager: JotterManager
+    @ObservedObject var timerService: TimerService
+    @ObservedObject var calendarSyncService: CalendarSyncService
     @State private var isDropTargeted: Bool = false
+    @State private var showPowerTools: Bool = false
 
     public init(
         appState: AppState,
@@ -17,7 +22,11 @@ public struct ExpandedNotchView: View {
         clipboardManager: ClipboardManager,
         timeService: TimeService,
         weatherService: WeatherService,
-        nowPlayingService: SystemNowPlayingService
+        nowPlayingService: SystemNowPlayingService,
+        fileShelfManager: FileShelfManager? = nil,
+        jotterManager: JotterManager? = nil,
+        timerService: TimerService? = nil,
+        calendarSyncService: CalendarSyncService? = nil
     ) {
         self.appState = appState
         self.screenManager = screenManager
@@ -25,11 +34,18 @@ public struct ExpandedNotchView: View {
         self.timeService = timeService
         self.weatherService = weatherService
         self.nowPlayingService = nowPlayingService
+        self.fileShelfManager = fileShelfManager ?? FileShelfManager()
+        self.jotterManager = jotterManager ?? JotterManager()
+        self.timerService = timerService ?? TimerService()
+        self.calendarSyncService = calendarSyncService ?? CalendarSyncService()
     }
 
     public var body: some View {
         ZStack {
             mainContentLayout
+            if showPowerTools {
+                powerToolsOverlayView
+            }
             if isDropTargeted {
                 airDropOverlayView
             }
@@ -40,7 +56,12 @@ public struct ExpandedNotchView: View {
             nowPlayingService.musicStudioProvider.fetchPlaybackState()
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
-            AirDropService.handleDroppedProviders(providers)
+            AirDropService.handleDroppedProviders(providers) { urls in
+                fileShelfManager.addFiles(urls)
+                withAnimation(DesignSystem.Animation.tabSwitch) {
+                    appState.selectedTab = .shelf
+                }
+            }
             return true
         }
         .onKeyPress { press in
@@ -53,9 +74,15 @@ public struct ExpandedNotchView: View {
                     withAnimation(DesignSystem.Animation.tabSwitch) { appState.selectedTab = .clipboard }
                     return .handled
                 case "3":
-                    withAnimation(DesignSystem.Animation.tabSwitch) { appState.selectedTab = .calendar }
+                    withAnimation(DesignSystem.Animation.tabSwitch) { appState.selectedTab = .shelf }
                     return .handled
                 case "4":
+                    withAnimation(DesignSystem.Animation.tabSwitch) { appState.selectedTab = .jotter }
+                    return .handled
+                case "5":
+                    withAnimation(DesignSystem.Animation.tabSwitch) { appState.selectedTab = .calendar }
+                    return .handled
+                case "6":
                     withAnimation(DesignSystem.Animation.tabSwitch) { appState.selectedTab = .weather }
                     return .handled
                 default:
@@ -94,8 +121,16 @@ public struct ExpandedNotchView: View {
             overviewHierarchyView
         case .clipboard:
             ClipboardView(clipboardManager: clipboardManager)
+        case .shelf:
+            FileShelfView(shelfManager: fileShelfManager)
+        case .jotter:
+            JotterView(jotterManager: jotterManager)
         case .calendar:
-            CalendarView(timeService: timeService)
+            CalendarView(
+                timeService: timeService,
+                calendarSyncService: calendarSyncService,
+                timerService: timerService
+            )
         case .weather:
             WeatherView(weatherService: weatherService, isCompact: false)
         }
@@ -104,11 +139,12 @@ public struct ExpandedNotchView: View {
     // MARK: - Header Bar (Left Ear / Notch Cutout / Right Ear Flanking Layout)
     private var topHeaderBar: some View {
         HStack(alignment: .center, spacing: 0) {
-            // Left Ear: MacNotch Icon, Overview & Clipboard (flanking left of the physical camera notch)
-            HStack(spacing: 6) {
+            // Left Ear: MacNotch Icon, Overview, Clipboard & File Shelf (flanking left of the physical camera notch)
+            HStack(spacing: 5) {
                 macNotchBrandBadge
                 tabButton(for: .overview)
                 tabButton(for: .clipboard)
+                tabButton(for: .shelf)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
             .padding(.trailing, 8)
@@ -119,10 +155,15 @@ public struct ExpandedNotchView: View {
             Color.clear
                 .frame(width: cameraWidth, height: cameraHeight)
 
-            // Right Ear: Calendar, Weather, AirDrop & Settings (flanking right of the physical camera notch)
+            // Right Ear: Jotter, Calendar, Weather, Power Tools, AirDrop & Settings (flanking right of the physical camera notch)
             HStack(spacing: 5) {
+                if timerService.isRunning {
+                    TimerWidgetView(timerService: timerService, isCompact: true)
+                }
+                tabButton(for: .jotter)
                 tabButton(for: .calendar)
                 tabButton(for: .weather)
+                toolsButton
                 airDropButton
                 settingsButton
             }
@@ -250,6 +291,67 @@ public struct ExpandedNotchView: View {
         }
         .buttonStyle(.plain)
         .help("Open MacNotch Settings")
+    }
+
+    private var toolsButton: some View {
+        Button(action: {
+            withAnimation(DesignSystem.Animation.tabSwitch) {
+                showPowerTools.toggle()
+            }
+        }) {
+            Image(systemName: "wand.and.stars")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(showPowerTools ? .accentColor : DesignSystem.Colors.textSecondary)
+                .frame(width: 24, height: 24)
+                .background(showPowerTools ? Color.accentColor.opacity(0.25) : Color.white.opacity(0.08))
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help("Power Tools (Eyedropper, Screen OCR, QR Generator)")
+    }
+
+    private var powerToolsOverlayView: some View {
+        ZStack {
+            Color.black.opacity(0.7)
+                .onTapGesture {
+                    withAnimation(DesignSystem.Animation.tabSwitch) {
+                        showPowerTools = false
+                    }
+                }
+
+            VStack(spacing: 8) {
+                HStack {
+                    Label("Power Tools Suite", systemImage: "wand.and.stars")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.accentColor)
+
+                    Spacer()
+
+                    Button(action: {
+                        withAnimation(DesignSystem.Animation.tabSwitch) {
+                            showPowerTools = false
+                        }
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(DesignSystem.Colors.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 4)
+
+                PowerToolsView(appState: appState, clipboardManager: clipboardManager)
+            }
+            .padding(12)
+            .background(.ultraThinMaterial)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(DesignSystem.Colors.subtleBorder, lineWidth: 1)
+            )
+            .padding(20)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.96)))
     }
 
     @State private var overviewLowerMode: OverviewLowerMode = .musicStudio

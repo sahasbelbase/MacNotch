@@ -23,6 +23,8 @@ public enum NotchState: String, CaseIterable, Sendable {
 public enum NotchTab: String, CaseIterable, Identifiable, Sendable {
     case overview = "Overview"
     case clipboard = "Clipboard"
+    case shelf = "Shelf"
+    case jotter = "Jotter"
     case calendar = "Calendar"
     case weather = "Weather"
 
@@ -32,10 +34,22 @@ public enum NotchTab: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .overview: return "square.grid.2x2"
         case .clipboard: return "doc.on.clipboard"
+        case .shelf: return "tray.and.arrow.down"
+        case .jotter: return "square.and.pencil"
         case .calendar: return "calendar"
         case .weather: return "cloud.sun"
         }
     }
+}
+
+/// Transient Notch overlays that briefly flank the notch without requiring hover activation.
+public enum TransientHUD: Equatable, Sendable {
+    case battery(percentage: Int, isCharging: Bool, timeRemaining: String?)
+    case volume(level: Float, isMuted: Bool)
+    case brightness(level: Float)
+    case capsLock(isOn: Bool)
+    case accessory(name: String, icon: String, batteryPercentage: Int?)
+    case notification(title: String, subtitle: String?, icon: String)
 }
 
 /// Central state machine and controller for the MacNotch application.
@@ -53,6 +67,10 @@ public final class AppState: ObservableObject {
         }
     }
 
+    // Transient HUD overlay (e.g. Volume, Battery MagSafe, Caps Lock)
+    @Published public private(set) var activeHUD: TransientHUD?
+    private var hudDismissTask: Task<Void, Never>?
+
     // Configurable delays (in seconds)
     @Published public var hoverActivationDelay: Double = 0.12
     @Published public var collapseDelay: Double = 0.35
@@ -61,6 +79,28 @@ public final class AppState: ObservableObject {
     private var collapseTask: Task<Void, Never>?
 
     public init() {}
+
+    /// Triggers a sleek notch HUD overlay that automatically dismisses after `duration` seconds.
+    public func showHUD(_ hud: TransientHUD, duration: Double = 2.5) {
+        guard isEnabled else { return }
+        guard currentState != .expanded else { return }
+
+        activeHUD = hud
+        hudDismissTask?.cancel()
+        hudDismissTask = Task { @MainActor [weak self] in
+            let delayNanos = UInt64(duration * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: delayNanos)
+            if !Task.isCancelled {
+                self?.dismissHUD()
+            }
+        }
+    }
+
+    public func dismissHUD() {
+        hudDismissTask?.cancel()
+        hudDismissTask = nil
+        activeHUD = nil
+    }
 
     /// Safely transitions to a new state, managing timers and avoiding jitter.
     public func transition(to newState: NotchState) {
@@ -114,6 +154,7 @@ public final class AppState: ObservableObject {
 
     public func handleMouseEnter() {
         guard isEnabled else { return }
+        dismissHUD()
         switch currentState {
         case .collapsed:
             transition(to: .activating)

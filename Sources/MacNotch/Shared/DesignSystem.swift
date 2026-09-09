@@ -32,6 +32,7 @@ public enum DesignSystem {
         public static let cardHoverBackground = Color(nsColor: .selectedControlColor).opacity(0.25)
         public static let subtleBorder = Color.white.opacity(0.12)
         public static let activeBorder = Color.accentColor.opacity(0.6)
+        public static let emerald = Color(red: 0.2, green: 0.85, blue: 0.45)
         public static let textPrimary = Color.primary
         public static let textSecondary = Color.secondary
         public static let textTertiary = Color.secondary.opacity(0.7)

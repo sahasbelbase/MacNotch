@@ -37,9 +37,13 @@ public struct MusicView: View {
     // MARK: - Compact View (Header status pill)
     private var compactView: some View {
         HStack(spacing: 5) {
-            Image(systemName: nowPlayingService.isPlaying ? "waveform" : "music.note")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.pink)
+            if nowPlayingService.isPlaying {
+                WaveformVisualizerView(isPlaying: true, color: .pink, barCount: 4, maxHeight: 10)
+            } else {
+                Image(systemName: "music.note")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.pink)
+            }
 
             if let track = nowPlayingService.currentTrack {
                 Text(track.title)
@@ -70,6 +74,10 @@ public struct MusicView: View {
                         .foregroundColor(DesignSystem.Colors.textPrimary)
                         .lineLimit(1)
                         .truncationMode(.tail)
+
+                    if nowPlayingService.isPlaying {
+                        WaveformVisualizerView(isPlaying: true, color: DesignSystem.Colors.emerald, barCount: 4, maxHeight: 10)
+                    }
 
                     if let player = nowPlayingService.activePlayerName {
                         Button(action: { openActivePlayer() }) {

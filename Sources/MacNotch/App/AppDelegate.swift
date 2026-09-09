@@ -12,6 +12,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public private(set) var timeService: TimeService!
     public private(set) var weatherService: WeatherService!
     public private(set) var nowPlayingService: SystemNowPlayingService!
+    public private(set) var batteryService: BatteryService!
+    public private(set) var systemHUDService: SystemHUDService!
+    public private(set) var fileShelfManager: FileShelfManager!
+    public private(set) var jotterManager: JotterManager!
+    public private(set) var timerService: TimerService!
+    public private(set) var calendarSyncService: CalendarSyncService!
+    public private(set) var bluetoothAccessoryService: BluetoothAccessoryService!
     public private(set) var menuBarManager: MenuBarManager!
 
     private var sleepObserver: NSObjectProtocol?
@@ -28,6 +35,59 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         self.timeService = TimeService()
         self.weatherService = WeatherService()
         self.nowPlayingService = SystemNowPlayingService()
+        self.batteryService = BatteryService()
+        self.systemHUDService = SystemHUDService()
+        self.fileShelfManager = FileShelfManager()
+        self.jotterManager = JotterManager()
+        self.timerService = TimerService()
+        self.calendarSyncService = CalendarSyncService()
+        self.bluetoothAccessoryService = BluetoothAccessoryService()
+
+        // Wire Battery / MagSafe Power Events to Notch Dynamic Island HUD
+        self.batteryService.onPowerEvent = { [weak self] snapshot, _ in
+            guard let self = self else { return }
+            let timeText: String? = {
+                if snapshot.isCharging, let minutes = snapshot.timeToFullMinutes {
+                    let hrs = minutes / 60
+                    let mins = minutes % 60
+                    return hrs > 0 ? "\(hrs)h \(mins)m to full" : "\(mins)m to full"
+                }
+                return nil
+            }()
+            self.appState.showHUD(
+                .battery(
+                    percentage: snapshot.percentage,
+                    isCharging: snapshot.isCharging,
+                    timeRemaining: timeText
+                ),
+                duration: 3.0
+            )
+        }
+
+        // Wire Volume and Caps Lock Events to Notch Dynamic Island HUD
+        self.systemHUDService.onVolumeChange = { [weak self] volume, isMuted in
+            self?.appState.showHUD(.volume(level: volume, isMuted: isMuted), duration: 2.0)
+        }
+
+        self.systemHUDService.onCapsLockChange = { [weak self] isCaps in
+            self?.appState.showHUD(.capsLock(isOn: isCaps), duration: 2.0)
+        }
+
+        // Wire Bluetooth Audio / AirPods Accessory Connection Events
+        self.bluetoothAccessoryService.onAccessoryConnected = { [weak self] event in
+            self?.appState.showHUD(
+                .accessory(name: event.name, icon: event.icon, batteryPercentage: event.batteryPercentage),
+                duration: 3.5
+            )
+        }
+
+        // Wire Focus Timer alerts to Notch Notification HUD
+        self.timerService.onTimerCompleted = { [weak self] mode in
+            self?.appState.showHUD(
+                .notification(title: "\(mode.title) Finished!", subtitle: "Focus session concluded", icon: "timer"),
+                duration: 4.0
+            )
+        }
 
         // Sync settings with AppState
         let settings = SettingsStore.shared
@@ -72,7 +132,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             clipboardManager: clipboardManager,
             timeService: timeService,
             weatherService: weatherService,
-            nowPlayingService: nowPlayingService
+            nowPlayingService: nowPlayingService,
+            fileShelfManager: fileShelfManager,
+            jotterManager: jotterManager,
+            timerService: timerService,
+            calendarSyncService: calendarSyncService
         )
         self.windowManager.setContent(rootView)
 

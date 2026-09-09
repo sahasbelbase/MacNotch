@@ -22,6 +22,9 @@ public struct NotchGeometry: Equatable, Sendable {
     /// Frame of the expanded utility panel in screen coordinates, anchored cleanly below the camera housing.
     public let expandedRect: CGRect
 
+    /// Frame of the transient HUD overlay panel in screen coordinates, flanking the camera notch.
+    public let hudRect: CGRect
+
     /// Display backing scale factor (e.g. 2.0 for Retina).
     public let backingScaleFactor: CGFloat
 
@@ -35,6 +38,7 @@ public struct NotchGeometry: Equatable, Sendable {
         activationRect: CGRect,
         collapsedRect: CGRect,
         expandedRect: CGRect,
+        hudRect: CGRect? = nil,
         backingScaleFactor: CGFloat,
         hasNotch: Bool
     ) {
@@ -44,6 +48,7 @@ public struct NotchGeometry: Equatable, Sendable {
         self.activationRect = activationRect
         self.collapsedRect = collapsedRect
         self.expandedRect = expandedRect
+        self.hudRect = hudRect ?? collapsedRect
         self.backingScaleFactor = backingScaleFactor
         self.hasNotch = hasNotch
     }
@@ -116,6 +121,13 @@ public struct NotchGeometry: Equatable, Sendable {
         let expandedY = anchorTopY - responsiveHeight
         let expandedRect = CGRect(x: expandedX, y: expandedY, width: responsiveWidth, height: responsiveHeight)
 
+        // Transient HUD panel rect (screen coords: bottom-left origin) - sleek wings flanking the notch
+        let hudWidth = min(cameraRect.width + 160, min(responsiveWidth, screenFrame.width - 40))
+        let hudHeight = cameraRect.height + 6
+        let hudX = cameraRect.midX - (hudWidth / 2)
+        let hudY = anchorTopY - hudHeight
+        let hudRect = CGRect(x: hudX, y: hudY, width: hudWidth, height: hudHeight)
+
         // Activation hover rect: strictly constrained to the physical camera housing bounds.
         // It NEVER extends into the menu bar to the left/right or into windows below the camera.
         let activationRect = cameraRect
@@ -127,6 +139,7 @@ public struct NotchGeometry: Equatable, Sendable {
             activationRect: activationRect,
             collapsedRect: collapsedRect,
             expandedRect: expandedRect,
+            hudRect: hudRect,
             backingScaleFactor: capabilities.backingScaleFactor,
             hasNotch: true
         )

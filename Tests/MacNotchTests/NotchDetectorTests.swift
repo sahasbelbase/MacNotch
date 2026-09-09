@@ -54,14 +54,18 @@ final class NotchDetectorTests: XCTestCase {
     @MainActor
     func testNotchTabCasesAndIcons() {
         let tabs = NotchTab.allCases
-        XCTAssertEqual(tabs.count, 4)
+        XCTAssertEqual(tabs.count, 6)
         XCTAssertTrue(tabs.contains(.overview))
         XCTAssertTrue(tabs.contains(.clipboard))
+        XCTAssertTrue(tabs.contains(.shelf))
+        XCTAssertTrue(tabs.contains(.jotter))
         XCTAssertTrue(tabs.contains(.calendar))
         XCTAssertTrue(tabs.contains(.weather))
 
         XCTAssertEqual(NotchTab.overview.icon, "square.grid.2x2")
         XCTAssertEqual(NotchTab.clipboard.icon, "doc.on.clipboard")
+        XCTAssertEqual(NotchTab.shelf.icon, "tray.and.arrow.down")
+        XCTAssertEqual(NotchTab.jotter.icon, "square.and.pencil")
         XCTAssertEqual(NotchTab.calendar.icon, "calendar")
         XCTAssertEqual(NotchTab.weather.icon, "cloud.sun")
     }

@@ -8,6 +8,10 @@ public struct NotchView: View {
     @ObservedObject var timeService: TimeService
     @ObservedObject var weatherService: WeatherService
     @ObservedObject var nowPlayingService: SystemNowPlayingService
+    @ObservedObject var fileShelfManager: FileShelfManager
+    @ObservedObject var jotterManager: JotterManager
+    @ObservedObject var timerService: TimerService
+    @ObservedObject var calendarSyncService: CalendarSyncService
     @Environment(\.accessibilityReduceMotion) var reduceMotion
 
     public init(
@@ -16,7 +20,11 @@ public struct NotchView: View {
         clipboardManager: ClipboardManager,
         timeService: TimeService,
         weatherService: WeatherService,
-        nowPlayingService: SystemNowPlayingService
+        nowPlayingService: SystemNowPlayingService,
+        fileShelfManager: FileShelfManager? = nil,
+        jotterManager: JotterManager? = nil,
+        timerService: TimerService? = nil,
+        calendarSyncService: CalendarSyncService? = nil
     ) {
         self.appState = appState
         self.screenManager = screenManager
@@ -24,6 +32,10 @@ public struct NotchView: View {
         self.timeService = timeService
         self.weatherService = weatherService
         self.nowPlayingService = nowPlayingService
+        self.fileShelfManager = fileShelfManager ?? FileShelfManager()
+        self.jotterManager = jotterManager ?? JotterManager()
+        self.timerService = timerService ?? TimerService()
+        self.calendarSyncService = calendarSyncService ?? CalendarSyncService()
     }
 
     public var body: some View {
@@ -35,7 +47,11 @@ public struct NotchView: View {
                     clipboardManager: clipboardManager,
                     timeService: timeService,
                     weatherService: weatherService,
-                    nowPlayingService: nowPlayingService
+                    nowPlayingService: nowPlayingService,
+                    fileShelfManager: fileShelfManager,
+                    jotterManager: jotterManager,
+                    timerService: timerService,
+                    calendarSyncService: calendarSyncService
                 )
                 .transition(
                     reduceMotion
@@ -46,8 +62,14 @@ public struct NotchView: View {
                     )
                 )
             } else if appState.currentState != .hidden {
-                CollapsedNotchView(appState: appState)
-                    .transition(.opacity)
+                CollapsedNotchView(
+                    appState: appState,
+                    screenManager: screenManager,
+                    fileShelfManager: fileShelfManager,
+                    timerService: timerService,
+                    nowPlayingService: nowPlayingService
+                )
+                .transition(.opacity)
             }
         }
         .animation(reduceMotion ? DesignSystem.Animation.reducedMotion : DesignSystem.Animation.expandSpring, value: appState.currentState)

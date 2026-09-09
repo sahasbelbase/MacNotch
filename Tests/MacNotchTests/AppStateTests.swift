@@ -58,4 +58,28 @@ final class AppStateTests: XCTestCase {
         appState.selectedTab = .overview
         XCTAssertEqual(appState.selectedTab, .overview)
     }
+
+    func testShowAndDismissHUD() {
+        XCTAssertNil(appState.activeHUD)
+        appState.showHUD(.battery(percentage: 85, isCharging: true, timeRemaining: "42m to full"), duration: 1.0)
+        XCTAssertEqual(appState.activeHUD, .battery(percentage: 85, isCharging: true, timeRemaining: "42m to full"))
+
+        appState.showHUD(.volume(level: 0.75, isMuted: false), duration: 1.0)
+        XCTAssertEqual(appState.activeHUD, .volume(level: 0.75, isMuted: false))
+
+        appState.showHUD(.capsLock(isOn: true), duration: 1.0)
+        XCTAssertEqual(appState.activeHUD, .capsLock(isOn: true))
+
+        appState.dismissHUD()
+        XCTAssertNil(appState.activeHUD)
+    }
+
+    func testHUDDismissOnMouseEnter() {
+        appState.showHUD(.volume(level: 0.5, isMuted: false), duration: 2.0)
+        XCTAssertNotNil(appState.activeHUD)
+
+        appState.handleMouseEnter()
+        XCTAssertNil(appState.activeHUD)
+        XCTAssertEqual(appState.currentState, .activating)
+    }
 }

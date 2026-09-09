@@ -28,6 +28,14 @@ public final class WindowManager: ObservableObject {
             }
             .store(in: &cancellables)
 
+        // React to HUD changes
+        appState.$activeHUD
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateWindowPositionAndVisibility()
+            }
+            .store(in: &cancellables)
+
         // React to geometry changes
         screenManager.$currentNotchGeometry
             .receive(on: RunLoop.main)
@@ -59,7 +67,11 @@ public final class WindowManager: ObservableObject {
         case .expanded:
             targetFrame = geometry.expandedRect
         case .collapsed, .activating, .collapsing:
-            targetFrame = geometry.collapsedRect
+            if appState.activeHUD != nil {
+                targetFrame = geometry.hudRect
+            } else {
+                targetFrame = geometry.collapsedRect
+            }
         case .hidden:
             panel.orderOut(nil)
             return
