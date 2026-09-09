@@ -13,11 +13,13 @@ public protocol WeatherServiceProtocol: AnyObject, ObservableObject {
 /// Fetches real-time weather forecasts via Open-Meteo API with local 15-minute caching.
 @MainActor
 public final class WeatherService: ObservableObject, WeatherServiceProtocol {
+    public static let shared = WeatherService()
+
     @Published public private(set) var currentWeather: WeatherInfo?
     @Published public private(set) var isLoading: Bool = false
     @Published public private(set) var errorMessage: String?
 
-    public var selectedLocation: WeatherLocation = .kathmandu {
+    public var selectedLocation: WeatherLocation {
         didSet {
             Task {
                 await fetchWeather(for: selectedLocation)
@@ -29,8 +31,47 @@ public final class WeatherService: ObservableObject, WeatherServiceProtocol {
     private let cacheDuration: TimeInterval = 900 // 15 minutes
 
     public init() {
+        let initialLoc = SettingsStore.shared.currentWeatherLocation
+        self.selectedLocation = initialLoc
         Task {
-            await fetchWeather(for: selectedLocation)
+            await fetchWeather(for: initialLoc)
+        }
+    }
+
+    public func setLocation(_ location: WeatherLocation) {
+        self.selectedLocation = location
+        SettingsStore.shared.currentWeatherLocation = location
+        Task {
+            await fetchWeather(for: location)
+        }
+    }
+
+    /// Queries Open-Meteo worldwide geocoding database for city names, countries, and coordinates.
+    public func searchLocations(query: String) async throws -> [WeatherLocation] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else { return [] }
+        guard let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://geocoding-api.open-meteo.com/v1/search?name=\(encoded)&count=10&language=en&format=json") else {
+            return []
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+
+        let decoded = try JSONDecoder().decode(OpenMeteoGeocodingResponse.self, from: data)
+        guard let results = decoded.results else { return [] }
+
+        return results.map { res in
+            WeatherLocation(
+                id: "\(res.id)",
+                name: res.name,
+                latitude: res.latitude,
+                longitude: res.longitude,
+                country: res.country,
+                admin1: res.admin1
+            )
         }
     }
 
@@ -130,4 +171,17 @@ private struct CurrentWeatherDTO: Decodable {
 private struct DailyWeatherDTO: Decodable {
     let temperature_2m_max: [Double]
     let temperature_2m_min: [Double]
+}
+
+private struct OpenMeteoGeocodingResponse: Decodable {
+    let results: [GeocodingResultDTO]?
+}
+
+private struct GeocodingResultDTO: Decodable {
+    let id: Int
+    let name: String
+    let latitude: Double
+    let longitude: Double
+    let country: String?
+    let admin1: String?
 }

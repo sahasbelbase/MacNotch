@@ -139,12 +139,13 @@ public struct ExpandedNotchView: View {
     // MARK: - Header Bar (Left Ear / Notch Cutout / Right Ear Flanking Layout)
     private var topHeaderBar: some View {
         HStack(alignment: .center, spacing: 0) {
-            // Left Ear: MacNotch Icon, Overview, Clipboard & File Shelf (flanking left of the physical camera notch)
+            // Left Ear: MacNotch Icon, Overview, Clipboard, File Shelf, & Jotter
             HStack(spacing: 5) {
                 macNotchBrandBadge
                 tabButton(for: .overview)
                 tabButton(for: .clipboard)
                 tabButton(for: .shelf)
+                tabButton(for: .jotter)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
             .padding(.trailing, 8)
@@ -155,14 +156,13 @@ public struct ExpandedNotchView: View {
             Color.clear
                 .frame(width: cameraWidth, height: cameraHeight)
 
-            // Right Ear: Jotter, Calendar, Weather, Power Tools, AirDrop & Settings (flanking right of the physical camera notch)
+            // Right Ear: Calendar, Weather, Timer Pill, Power Tools, AirDrop & Settings
             HStack(spacing: 5) {
+                tabButton(for: .calendar)
+                tabButton(for: .weather)
                 if timerService.isRunning {
                     TimerWidgetView(timerService: timerService, isCompact: true)
                 }
-                tabButton(for: .jotter)
-                tabButton(for: .calendar)
-                tabButton(for: .weather)
                 toolsButton
                 airDropButton
                 settingsButton
@@ -203,6 +203,7 @@ public struct ExpandedNotchView: View {
 
     @ViewBuilder
     private func tabButton(for tab: NotchTab) -> some View {
+        let isSelected = appState.selectedTab == tab
         Button(action: {
             withAnimation(DesignSystem.Animation.tabSwitch) {
                 appState.selectedTab = tab
@@ -210,19 +211,25 @@ public struct ExpandedNotchView: View {
         }) {
             HStack(spacing: 4) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 10, weight: .semibold))
-                Text(tab.rawValue)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 11, weight: isSelected ? .bold : .medium))
+                if isSelected {
+                    Text(tab.rawValue)
+                        .font(.system(size: 11, weight: .semibold))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, isSelected ? 8 : 6)
             .padding(.vertical, 4)
             .background(
                 Capsule()
-                    .fill(appState.selectedTab == tab ? Color.white.opacity(0.18) : Color.clear)
+                    .fill(isSelected ? Color.white.opacity(0.18) : Color.clear)
             )
-            .foregroundColor(appState.selectedTab == tab ? .white : DesignSystem.Colors.textSecondary)
+            .foregroundColor(isSelected ? .white : DesignSystem.Colors.textSecondary)
         }
         .buttonStyle(.plain)
+        .pointingHandCursor()
+        .help(tab.rawValue)
     }
 
     private var airDropButton: some View {

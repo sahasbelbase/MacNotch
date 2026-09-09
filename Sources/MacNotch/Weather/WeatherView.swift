@@ -3,12 +3,17 @@ import SwiftUI
 /// Displays weather information in compact or expanded layouts.
 public struct WeatherView: View {
     @ObservedObject var weatherService: WeatherService
-    public var unit: TemperatureUnit = .celsius
+    @ObservedObject var settings = SettingsStore.shared
+    public var explicitUnit: TemperatureUnit?
     public var isCompact: Bool = false
 
-    public init(weatherService: WeatherService, unit: TemperatureUnit = .celsius, isCompact: Bool = false) {
+    public var effectiveUnit: TemperatureUnit {
+        explicitUnit ?? settings.temperatureUnit
+    }
+
+    public init(weatherService: WeatherService, unit: TemperatureUnit? = nil, isCompact: Bool = false) {
         self.weatherService = weatherService
-        self.unit = unit
+        self.explicitUnit = unit
         self.isCompact = isCompact
     }
 
@@ -27,7 +32,7 @@ public struct WeatherView: View {
                     .font(.system(size: 11))
                     .foregroundColor(.yellow)
 
-                Text(weather.formattedTemp(unit: unit))
+                Text(weather.formattedTemp(unit: effectiveUnit))
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundColor(DesignSystem.Colors.textPrimary)
             } else {
@@ -48,7 +53,7 @@ public struct WeatherView: View {
                             .foregroundColor(DesignSystem.Colors.textPrimary)
 
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text(weather.formattedTemp(unit: unit))
+                            Text(weather.formattedTemp(unit: effectiveUnit))
                                 .font(.system(size: 26, weight: .bold, design: .rounded))
                                 .foregroundColor(DesignSystem.Colors.textPrimary)
 
@@ -69,13 +74,13 @@ public struct WeatherView: View {
                     .background(DesignSystem.Colors.subtleBorder)
 
                 HStack {
-                    Text("Feels like \(weather.formattedFeelsLike(unit: unit))")
+                    Text("Feels like \(weather.formattedFeelsLike(unit: effectiveUnit))")
                         .font(.system(size: 10))
                         .foregroundColor(DesignSystem.Colors.textSecondary)
 
                     Spacer()
 
-                    Text("H \(weather.formattedHigh(unit: unit))  L \(weather.formattedLow(unit: unit))")
+                    Text("H \(weather.formattedHigh(unit: effectiveUnit))  L \(weather.formattedLow(unit: effectiveUnit))")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(DesignSystem.Colors.textSecondary)
                 }

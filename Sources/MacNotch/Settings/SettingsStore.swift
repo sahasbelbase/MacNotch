@@ -30,7 +30,35 @@ public final class SettingsStore: ObservableObject {
 
     // MARK: - Weather Settings
     @AppStorage("selectedLocationId") public var selectedLocationId: String = "ktm"
+    @AppStorage("selectedLocationName") public var selectedLocationName: String = "Kathmandu"
+    @AppStorage("selectedLocationLat") public var selectedLocationLat: Double = 27.7172
+    @AppStorage("selectedLocationLon") public var selectedLocationLon: Double = 85.3240
+    @AppStorage("selectedLocationCountry") public var selectedLocationCountry: String = "Nepal"
     @AppStorage("tempUnit") public var tempUnit: String = TemperatureUnit.celsius.rawValue
+
+    public var currentWeatherLocation: WeatherLocation {
+        get {
+            WeatherLocation(
+                id: selectedLocationId,
+                name: selectedLocationName,
+                latitude: selectedLocationLat,
+                longitude: selectedLocationLon,
+                country: selectedLocationCountry.isEmpty ? nil : selectedLocationCountry
+            )
+        }
+        set {
+            selectedLocationId = newValue.id
+            selectedLocationName = newValue.name
+            selectedLocationLat = newValue.latitude
+            selectedLocationLon = newValue.longitude
+            selectedLocationCountry = newValue.country ?? ""
+        }
+    }
+
+    public var temperatureUnit: TemperatureUnit {
+        get { TemperatureUnit(rawValue: tempUnit) ?? .celsius }
+        set { tempUnit = newValue.rawValue }
+    }
 
     // MARK: - Appearance & Diagnostic Settings
     @AppStorage("appAppearance") public var appAppearance: String = "System"
@@ -94,6 +122,10 @@ public final class SettingsStore: ObservableObject {
         showOverviewClipboard = true
         defaultTab = "Overview"
         selectedLocationId = "ktm"
+        selectedLocationName = "Kathmandu"
+        selectedLocationLat = 27.7172
+        selectedLocationLon = 85.3240
+        selectedLocationCountry = "Nepal"
         tempUnit = TemperatureUnit.celsius.rawValue
         appAppearance = "System"
     }

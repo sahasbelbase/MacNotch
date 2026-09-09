@@ -87,8 +87,8 @@ public final class MouseTracker: ObservableObject {
 
         let isInsideActivation = geometry.activationRect.contains(screenLocation)
         let expandedRect = geometry.expandedRect
-        // Provide 10pt safety margin around the expanded frame so cursor can navigate easily
-        let isInsideExpanded = expandedRect.insetBy(dx: -10, dy: -10).contains(screenLocation)
+        // Provide 20pt horizontal and 30pt bottom safety margin around the expanded frame so cursor can interact with bottom controls (like focus timer) without accidental collapse
+        let isInsideExpanded = expandedRect.insetBy(dx: -20, dy: -30).contains(screenLocation)
 
         switch appState.currentState {
         case .collapsed:

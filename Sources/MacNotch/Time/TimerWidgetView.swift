@@ -83,6 +83,7 @@ public struct TimerWidgetView: View {
                                 .clipShape(Circle())
                         }
                         .buttonStyle(.plain)
+                        .pointingHandCursor()
                     } else if timerService.isPaused {
                         Button(action: { timerService.resume() }) {
                             Image(systemName: "play.fill")
@@ -93,6 +94,7 @@ public struct TimerWidgetView: View {
                                 .clipShape(Circle())
                         }
                         .buttonStyle(.plain)
+                        .pointingHandCursor()
                     } else {
                         Button(action: { timerService.start(minutes: 25, mode: .pomodoro(minutes: 25)) }) {
                             Image(systemName: "play.fill")
@@ -103,6 +105,7 @@ public struct TimerWidgetView: View {
                                 .clipShape(Circle())
                         }
                         .buttonStyle(.plain)
+                        .pointingHandCursor()
                     }
 
                     if timerService.isRunning || timerService.isPaused {
@@ -114,6 +117,7 @@ public struct TimerWidgetView: View {
                                 .clipShape(Circle())
                         }
                         .buttonStyle(.plain)
+                        .pointingHandCursor()
                     }
                 }
             }

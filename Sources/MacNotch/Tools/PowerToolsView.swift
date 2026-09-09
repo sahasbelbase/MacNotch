@@ -8,21 +8,33 @@ public struct PowerToolsView: View {
 
     @State private var qrInputText: String = ""
     @State private var qrImage: NSImage?
-    @State private var activeToolTab: PowerToolTab = .colorSampler
+    @State private var activeToolTab: PowerToolTab = .screenshot
     @State private var isProcessing: Bool = false
+    @State private var keyboardBrightness: Float = 0.5
+    @State private var screenBrightness: Float = 0.7
 
     public enum PowerToolTab: String, CaseIterable {
-        case colorSampler = "Color Dropper"
+        case screenshot = "Screenshot"
         case screenOCR = "Screen OCR"
+        case colorSampler = "Color Dropper"
         case qrGenerator = "QR Generator"
+        case hardware = "Brightness & Backlight"
 
         var icon: String {
             switch self {
-            case .colorSampler: return "eyedropper.halffull"
+            case .screenshot: return "camera.viewfinder"
             case .screenOCR: return "text.viewfinder"
+            case .colorSampler: return "eyedropper.halffull"
             case .qrGenerator: return "qrcode"
+            case .hardware: return "slider.horizontal.3"
             }
         }
+    }
+
+    public enum ScreenshotMode {
+        case selection
+        case window
+        case fullScreen
     }
 
     public init(appState: AppState, clipboardManager: ClipboardManager) {
@@ -59,12 +71,16 @@ public struct PowerToolsView: View {
 
             // Content per tool
             switch activeToolTab {
-            case .colorSampler:
-                colorSamplerCard
+            case .screenshot:
+                screenshotCard
             case .screenOCR:
                 screenOCRCard
+            case .colorSampler:
+                colorSamplerCard
             case .qrGenerator:
                 qrGeneratorCard
+            case .hardware:
+                hardwareControlsCard
             }
         }
         .padding(10)
@@ -74,6 +90,178 @@ public struct PowerToolsView: View {
                 qrInputText = firstClip
                 qrImage = QRCodeService.shared.generateQRCode(from: firstClip, size: 120)
             }
+        }
+    }
+
+    // MARK: - Screenshot Studio Card
+
+    private var screenshotCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "camera.viewfinder")
+                .font(.system(size: 24))
+                .foregroundColor(.purple)
+                .frame(width: 44, height: 44)
+                .background(Color.purple.opacity(0.15))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Screenshot Studio")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                Text("Capture interactive selection, window, or entire screen. Saves directly to Desktop & Clipboard.")
+                    .font(.system(size: 10))
+                    .foregroundColor(DesignSystem.Colors.textTertiary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            HStack(spacing: 6) {
+                Button(action: { triggerScreenshot(mode: .selection) }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "rectangle.dashed")
+                        Text("Area")
+                    }
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(Color.purple)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+
+                Button(action: { triggerScreenshot(mode: .window) }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "macwindow")
+                        Text("Window")
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.08))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+
+                Button(action: { triggerScreenshot(mode: .fullScreen) }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "display")
+                        Text("Full")
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.08))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(8)
+        .background(Color.white.opacity(0.03))
+        .cornerRadius(8)
+    }
+
+    private func triggerScreenshot(mode: ScreenshotMode) {
+        guard let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first else { return }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        let filename = "Screen Shot \(formatter.string(from: Date())).png"
+        let fileURL = desktop.appendingPathComponent(filename)
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+            var args = ["-c"] // Copy to clipboard
+            switch mode {
+            case .selection:
+                args.append("-i")
+            case .window:
+                args.append("-w")
+            case .fullScreen:
+                break
+            }
+            args.append(fileURL.path)
+            process.arguments = args
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+
+                DispatchQueue.main.async {
+                    if FileManager.default.fileExists(atPath: fileURL.path) {
+                        self.appState.showHUD(
+                            .notification(
+                                title: "Screenshot Captured",
+                                subtitle: "Saved to Desktop & Clipboard",
+                                icon: "camera.fill"
+                            ),
+                            duration: 3.0
+                        )
+                    }
+                }
+            } catch {
+                print("Failed to run screencapture: \(error)")
+            }
+        }
+    }
+
+    // MARK: - Hardware Quick Controls Card
+
+    private var hardwareControlsCard: some View {
+        HStack(spacing: 14) {
+            // Keyboard Backlight
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Image(systemName: "keyboard.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.cyan)
+                    Text("Keyboard Backlight")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                    Spacer()
+                    Text("\(Int(keyboardBrightness * 100))%")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(.cyan)
+                }
+
+                Slider(value: $keyboardBrightness, in: 0...1)
+                    .accentColor(.cyan)
+                    .onChange(of: keyboardBrightness) { newVal in
+                        appState.showHUD(.keyboardBrightness(level: newVal), duration: 2.0)
+                    }
+            }
+            .padding(8)
+            .background(Color.white.opacity(0.04))
+            .cornerRadius(8)
+
+            // Screen Brightness
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Image(systemName: "sun.max.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.yellow)
+                    Text("Display Brightness")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(DesignSystem.Colors.textPrimary)
+                    Spacer()
+                    Text("\(Int(screenBrightness * 100))%")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(.yellow)
+                }
+
+                Slider(value: $screenBrightness, in: 0...1)
+                    .accentColor(.yellow)
+                    .onChange(of: screenBrightness) { newVal in
+                        appState.showHUD(.brightness(level: newVal), duration: 2.0)
+                    }
+            }
+            .padding(8)
+            .background(Color.white.opacity(0.04))
+            .cornerRadius(8)
         }
     }
 

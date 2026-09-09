@@ -94,6 +94,11 @@ public struct NotchHUDView: View {
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(.yellow)
 
+        case .keyboardBrightness:
+            Image(systemName: "keyboard.fill")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(Color.cyan)
+
         case .capsLock(let isOn):
             Image(systemName: "capslock.fill")
                 .font(.system(size: 12, weight: .bold))
@@ -175,6 +180,24 @@ public struct NotchHUDView: View {
                     .foregroundColor(.white)
             }
 
+        case .keyboardBrightness(let level):
+            HStack(spacing: 6) {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.white.opacity(0.2))
+                        Capsule()
+                            .fill(Color.cyan.opacity(0.9))
+                            .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(level))))
+                    }
+                }
+                .frame(width: 54, height: 6)
+
+                Text("\(Int(level * 100))%")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white)
+            }
+
         case .capsLock(let isOn):
             Text(isOn ? "CAPS LOCK ON" : "CAPS LOCK OFF")
                 .font(.system(size: 10, weight: .bold, design: .rounded))
@@ -222,6 +245,8 @@ public struct NotchHUDView: View {
             return isMuted ? Color.red.opacity(0.5) : Color.white.opacity(0.2)
         case .brightness:
             return Color.yellow.opacity(0.5)
+        case .keyboardBrightness:
+            return Color.cyan.opacity(0.5)
         case .accessory:
             return DesignSystem.Colors.emerald.opacity(0.6)
         case .notification:
@@ -239,6 +264,8 @@ public struct NotchHUDView: View {
             return isMuted ? Color.red.opacity(0.3) : Color.black.opacity(0.4)
         case .brightness:
             return Color.yellow.opacity(0.25)
+        case .keyboardBrightness:
+            return Color.cyan.opacity(0.25)
         case .accessory:
             return DesignSystem.Colors.emerald.opacity(0.35)
         case .notification:

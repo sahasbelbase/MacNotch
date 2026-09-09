@@ -93,15 +93,14 @@ public struct NotchGeometry: Equatable, Sendable {
             return nil
         }
 
-        // Responsive expanded width: 42% of display width, clamped to ensure camera notch and flanking ears
-        // have generous width across all MacBook models (13" Air, 15" Air, 14" Pro, 16" Pro) and scaling modes.
-        let calculatedWidth = screenFrame.width * 0.42
-        let minWidth = max(680, cameraRect.width + 440)
-        let responsiveWidth = min(max(calculatedWidth, minWidth), min(screenFrame.width - 40, 840))
+        // Responsive expanded width: clamped to ensure comfortable flanking ears without occupying half the display
+        let calculatedWidth = screenFrame.width * 0.40
+        let minWidth = max(660, cameraRect.width + 380)
+        let responsiveWidth = min(max(calculatedWidth, minWidth), min(screenFrame.width - 40, 740))
 
-        // Responsive expanded height: ~26% of display height, clamped between 280pt and 340pt
-        let calculatedHeight = screenFrame.height * 0.26
-        let responsiveHeight = min(max(calculatedHeight, 280), 340)
+        // Responsive expanded height: clamped between 370pt and 400pt so calendar and timer fit comfortably
+        let calculatedHeight = screenFrame.height * 0.28
+        let responsiveHeight = min(max(calculatedHeight, 370), 400)
 
         // Collapsed chin height: fits the camera housing + subtle 4pt chin
         let collapsedHeight = cameraRect.height + 4

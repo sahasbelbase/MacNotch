@@ -8,11 +8,20 @@ public final class WindowManager: ObservableObject {
     public let panel: NotchPanel
     private let appState: AppState
     private let screenManager: ScreenManager
+    private weak var nowPlayingService: SystemNowPlayingService?
+    private weak var timerService: TimerService?
     private var cancellables = Set<AnyCancellable>()
 
-    public init(appState: AppState, screenManager: ScreenManager) {
+    public init(
+        appState: AppState,
+        screenManager: ScreenManager,
+        nowPlayingService: SystemNowPlayingService? = nil,
+        timerService: TimerService? = nil
+    ) {
         self.appState = appState
         self.screenManager = screenManager
+        self.nowPlayingService = nowPlayingService
+        self.timerService = timerService
         self.panel = NotchPanel(contentRect: .zero)
 
         setupSubscriptions()
@@ -30,6 +39,22 @@ public final class WindowManager: ObservableObject {
 
         // React to HUD changes
         appState.$activeHUD
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateWindowPositionAndVisibility()
+            }
+            .store(in: &cancellables)
+
+        // React to music playback state
+        nowPlayingService?.$isPlaying
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateWindowPositionAndVisibility()
+            }
+            .store(in: &cancellables)
+
+        // React to focus timer state
+        timerService?.$isRunning
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 self?.updateWindowPositionAndVisibility()
@@ -67,7 +92,9 @@ public final class WindowManager: ObservableObject {
         case .expanded:
             targetFrame = geometry.expandedRect
         case .collapsed, .activating, .collapsing:
-            if appState.activeHUD != nil {
+            let hasMusicHint = (nowPlayingService?.isPlaying == true)
+            let hasActiveTimer = (timerService?.isRunning == true)
+            if appState.activeHUD != nil || hasMusicHint || hasActiveTimer {
                 targetFrame = geometry.hudRect
             } else {
                 targetFrame = geometry.collapsedRect

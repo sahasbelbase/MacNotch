@@ -45,48 +45,82 @@ public struct CollapsedNotchView: View {
                 .shadow(color: Color.cyan.opacity(0.6), radius: 8, x: 0, y: 2)
                 .transition(.scale.combined(with: .opacity))
             } else if let timer = timerService, timer.isRunning {
-                HStack(spacing: 5) {
-                    Image(systemName: "timer")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.orange)
-                    Text(timer.formattedRemaining)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 3.5)
-                .background(Color.black.opacity(0.85))
-                .overlay(
-                    Capsule().stroke(Color.orange.opacity(0.7), lineWidth: 1)
-                )
-                .clipShape(Capsule())
-                .shadow(color: Color.orange.opacity(0.4), radius: 6, x: 0, y: 1)
-                .transition(.scale.combined(with: .opacity))
-            } else if let nowPlaying = nowPlayingService, nowPlaying.isPlaying {
-                HStack(spacing: 5) {
-                    WaveformVisualizerView(
-                        isPlaying: true,
-                        color: DesignSystem.Colors.emerald,
-                        barCount: 4,
-                        maxHeight: 9
-                    )
-                    if let track = nowPlaying.currentTrack?.title, !track.isEmpty {
-                        Text(track)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.white.opacity(0.9))
-                            .lineLimit(1)
-                            .frame(maxWidth: 80)
+                let camWidth = screenManager.currentNotchGeometry?.cameraExclusionRect?.width ?? 200
+                let camHeight = screenManager.currentNotchGeometry?.cameraExclusionRect?.height ?? 34
+                HStack(spacing: 0) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "timer")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.orange)
                     }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 10)
+
+                    Color.clear
+                        .frame(width: max(camWidth, 160), height: camHeight)
+
+                    HStack(spacing: 4) {
+                        Text(timer.formattedRemaining)
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 10)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3.5)
-                .background(Color.black.opacity(0.85))
-                .overlay(
-                    Capsule().stroke(DesignSystem.Colors.emerald.opacity(0.6), lineWidth: 1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(Color.black.opacity(0.88))
+                        .overlay(
+                            Capsule().stroke(Color.orange.opacity(0.5), lineWidth: 1)
+                        )
+                        .shadow(color: Color.orange.opacity(0.25), radius: 8, x: 0, y: 1)
                 )
-                .clipShape(Capsule())
-                .shadow(color: DesignSystem.Colors.emerald.opacity(0.35), radius: 6, x: 0, y: 1)
-                .transition(.scale.combined(with: .opacity))
+                .transition(.scale(scale: 0.95, anchor: .top).combined(with: .opacity))
+            } else if let nowPlaying = nowPlayingService, nowPlaying.isPlaying {
+                let camWidth = screenManager.currentNotchGeometry?.cameraExclusionRect?.width ?? 200
+                let camHeight = screenManager.currentNotchGeometry?.cameraExclusionRect?.height ?? 34
+                HStack(spacing: 0) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "music.note")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(DesignSystem.Colors.emerald)
+
+                        WaveformVisualizerView(
+                            isPlaying: true,
+                            color: DesignSystem.Colors.emerald,
+                            barCount: 4,
+                            maxHeight: 10
+                        )
+                    }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 10)
+
+                    Color.clear
+                        .frame(width: max(camWidth, 160), height: camHeight)
+
+                    HStack(spacing: 4) {
+                        Text(nowPlaying.currentTrack?.title ?? "Playing")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 10)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(Color.black.opacity(0.88))
+                        .overlay(
+                            Capsule().stroke(DesignSystem.Colors.emerald.opacity(0.4), lineWidth: 1)
+                        )
+                        .shadow(color: DesignSystem.Colors.emerald.opacity(0.25), radius: 8, x: 0, y: 1)
+                )
+                .transition(.scale(scale: 0.95, anchor: .top).combined(with: .opacity))
             } else if appState.currentState == .activating {
                 Capsule()
                     .fill(Color.accentColor.opacity(0.95))

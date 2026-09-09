@@ -6,6 +6,11 @@ public struct SettingsView: View {
     @ObservedObject var screenManager: ScreenManager
     @ObservedObject var clipboardManager: ClipboardManager
 
+    @State private var citySearchText: String = ""
+    @State private var searchResults: [WeatherLocation] = []
+    @State private var isSearchingCity: Bool = false
+    @State private var searchFeedback: String? = nil
+
     public init(screenManager: ScreenManager, clipboardManager: ClipboardManager) {
         self.screenManager = screenManager
         self.clipboardManager = clipboardManager
@@ -224,10 +229,109 @@ public struct SettingsView: View {
 
     private var weatherTab: some View {
         Form {
-            Section("Location") {
-                Picker("City", selection: $settings.selectedLocationId) {
+            Section("Current Active Location") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(settings.selectedLocationName)
+                                .font(.system(size: 14, weight: .bold))
+                            if !settings.selectedLocationCountry.isEmpty {
+                                Text(settings.selectedLocationCountry)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        Text(String(format: "%.4f°, %.4f°", settings.selectedLocationLat, settings.selectedLocationLon))
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.system(size: 18))
+                }
+            }
+
+            Section("Search Any City Worldwide") {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        TextField("Search city (e.g. Kathmandu, Pokhara, Paris, Tokyo)...", text: $citySearchText)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit {
+                                performCitySearch()
+                            }
+
+                        Button(action: performCitySearch) {
+                            if isSearchingCity {
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                                    .frame(width: 14, height: 14)
+                            } else {
+                                Text("Search")
+                            }
+                        }
+                        .disabled(citySearchText.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 || isSearchingCity)
+                    }
+
+                    if let feedback = searchFeedback {
+                        Text(feedback)
+                            .font(.system(size: 10))
+                            .foregroundColor(.orange)
+                    }
+
+                    if !searchResults.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Matching Locations:")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.secondary)
+
+                            ForEach(searchResults) { loc in
+                                Button(action: {
+                                    selectLocation(loc)
+                                }) {
+                                    HStack {
+                                        Image(systemName: "mappin.circle.fill")
+                                            .foregroundColor(.accentColor)
+                                        Text(loc.displayName)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.primary)
+                                        Spacer()
+                                        Text(String(format: "%.2f°, %.2f°", loc.latitude, loc.longitude))
+                                            .font(.system(size: 9, design: .monospaced))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.vertical, 3)
+                                    .padding(.horizontal, 6)
+                                    .background(Color.accentColor.opacity(0.06))
+                                    .cornerRadius(4)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+                }
+            }
+
+            Section("Quick Presets") {
+                HStack(spacing: 6) {
                     ForEach(WeatherLocation.presets) { loc in
-                        Text(loc.name).tag(loc.id)
+                        let isCurrent = settings.selectedLocationId == loc.id || (settings.selectedLocationName == loc.name)
+                        Button(action: {
+                            selectLocation(loc)
+                        }) {
+                            Text(loc.name)
+                                .font(.system(size: 11, weight: isCurrent ? .bold : .regular))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(isCurrent ? Color.accentColor.opacity(0.2) : Color.white.opacity(0.06))
+                                .foregroundColor(isCurrent ? .accentColor : .primary)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -242,6 +346,38 @@ public struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private func performCitySearch() {
+        let query = citySearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard query.count >= 2 else { return }
+        isSearchingCity = true
+        searchFeedback = nil
+        Task {
+            do {
+                let results = try await WeatherService.shared.searchLocations(query: query)
+                await MainActor.run {
+                    self.isSearchingCity = false
+                    self.searchResults = results
+                    if results.isEmpty {
+                        self.searchFeedback = "No locations found for '\(query)'."
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.isSearchingCity = false
+                    self.searchFeedback = "Search failed: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func selectLocation(_ location: WeatherLocation) {
+        settings.currentWeatherLocation = location
+        WeatherService.shared.setLocation(location)
+        searchResults = []
+        citySearchText = ""
+        searchFeedback = "Updated to \(location.displayName)!"
     }
 
     // MARK: - Appearance Tab

@@ -47,6 +47,7 @@ public enum TransientHUD: Equatable, Sendable {
     case battery(percentage: Int, isCharging: Bool, timeRemaining: String?)
     case volume(level: Float, isMuted: Bool)
     case brightness(level: Float)
+    case keyboardBrightness(level: Float)
     case capsLock(isOn: Bool)
     case accessory(name: String, icon: String, batteryPercentage: Int?)
     case notification(title: String, subtitle: String?, icon: String)

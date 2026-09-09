@@ -10,12 +10,17 @@ public final class SystemHUDService: ObservableObject {
     @Published public private(set) var currentVolume: Float = 0.5
     @Published public private(set) var isMuted: Bool = false
     @Published public private(set) var isCapsLockOn: Bool = false
+    @Published public private(set) var keyboardBrightness: Float = 0.5
+    @Published public private(set) var screenBrightness: Float = 0.7
 
     public var onVolumeChange: ((Float, Bool) -> Void)?
     public var onCapsLockChange: ((Bool) -> Void)?
+    public var onKeyboardBrightnessChange: ((Float) -> Void)?
+    public var onScreenBrightnessChange: ((Float) -> Void)?
 
     private var globalFlagsMonitor: Any?
     private var localFlagsMonitor: Any?
+    private var systemEventsMonitor: Any?
     private var defaultOutputDeviceID: AudioDeviceID = 0
     private var hasListener: Bool = false
 
@@ -23,6 +28,7 @@ public final class SystemHUDService: ObservableObject {
         self.isCapsLockOn = NSEvent.modifierFlags.contains(.capsLock)
         setupCapsLockMonitoring()
         setupVolumeMonitoring()
+        setupMediaKeyMonitoring()
     }
 
     deinit {
@@ -31,6 +37,9 @@ public final class SystemHUDService: ObservableObject {
         }
         if let local = localFlagsMonitor {
             NSEvent.removeMonitor(local)
+        }
+        if let sys = systemEventsMonitor {
+            NSEvent.removeMonitor(sys)
         }
     }
 
@@ -166,5 +175,63 @@ public final class SystemHUDService: ObservableObject {
         if abs(self.currentVolume - oldVolume) > 0.005 || self.isMuted != oldMuted {
             onVolumeChange?(self.currentVolume, self.isMuted)
         }
+    }
+
+    // MARK: - Display & Keyboard Backlight Monitoring
+
+    private func setupMediaKeyMonitoring() {
+        systemEventsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .systemDefined) { [weak self] event in
+            guard event.subtype.rawValue == 8 else { return }
+            let data = event.data1
+            let keyCode = Int((data & 0xFFFF0000) >> 16)
+            let keyFlags = (data & 0x0000FFFF)
+            let keyState = (((keyFlags & 0xFF00) >> 8)) == 0xA // Key down
+            guard keyState else { return }
+
+            MainActor.assumeIsolated {
+                switch keyCode {
+                case 21: // NX_KEYTYPE_ILLUMINATION_UP
+                    self?.adjustKeyboardBrightness(delta: 0.0625)
+                case 22: // NX_KEYTYPE_ILLUMINATION_DOWN
+                    self?.adjustKeyboardBrightness(delta: -0.0625)
+                case 23: // NX_KEYTYPE_ILLUMINATION_TOGGLE
+                    self?.toggleKeyboardBrightness()
+                case 2:  // NX_KEYTYPE_BRIGHTNESS_UP
+                    self?.adjustScreenBrightness(delta: 0.0625)
+                case 3:  // NX_KEYTYPE_BRIGHTNESS_DOWN
+                    self?.adjustScreenBrightness(delta: -0.0625)
+                default:
+                    break
+                }
+            }
+        }
+    }
+
+    public func setKeyboardBrightness(_ level: Float) {
+        let clamped = max(0.0, min(1.0, level))
+        self.keyboardBrightness = clamped
+        onKeyboardBrightnessChange?(clamped)
+    }
+
+    public func adjustKeyboardBrightness(delta: Float) {
+        setKeyboardBrightness(self.keyboardBrightness + delta)
+    }
+
+    public func toggleKeyboardBrightness() {
+        if self.keyboardBrightness > 0.05 {
+            setKeyboardBrightness(0.0)
+        } else {
+            setKeyboardBrightness(0.75)
+        }
+    }
+
+    public func setScreenBrightness(_ level: Float) {
+        let clamped = max(0.0, min(1.0, level))
+        self.screenBrightness = clamped
+        onScreenBrightnessChange?(clamped)
+    }
+
+    public func adjustScreenBrightness(delta: Float) {
+        setScreenBrightness(self.screenBrightness + delta)
     }
 }

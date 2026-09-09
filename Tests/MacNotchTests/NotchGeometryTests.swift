@@ -36,10 +36,10 @@ final class NotchGeometryTests: XCTestCase {
         XCTAssertEqual(geo.collapsedRect.midX, cameraRect.midX, "Collapsed panel must be centered with camera")
         XCTAssertEqual(geo.expandedRect.midX, cameraRect.midX, "Expanded panel must be centered with camera")
 
-        // Responsive Sizing: 1800 * 0.42 = 756
-        XCTAssertEqual(geo.expandedRect.width, 756, accuracy: 1.0)
-        XCTAssertGreaterThanOrEqual(geo.expandedRect.width, 680)
-        XCTAssertLessThanOrEqual(geo.expandedRect.width, 840)
+        // Responsive Sizing: 1800 * 0.40 = 720
+        XCTAssertEqual(geo.expandedRect.width, 720, accuracy: 1.0)
+        XCTAssertGreaterThanOrEqual(geo.expandedRect.width, 660)
+        XCTAssertLessThanOrEqual(geo.expandedRect.width, 740)
 
         // Activation Rect is strictly constrained to hardware camera bounds
         XCTAssertEqual(geo.activationRect, cameraRect)
@@ -59,8 +59,8 @@ final class NotchGeometryTests: XCTestCase {
         )
 
         let geo = NotchGeometry.compute(from: caps, screenFrame: frame)!
-        // 1728 * 0.42 = 725.76
-        XCTAssertEqual(geo.expandedRect.width, 725.76, accuracy: 1.0)
+        // 1728 * 0.40 = 691.2
+        XCTAssertEqual(geo.expandedRect.width, 691.2, accuracy: 1.0)
         XCTAssertEqual(geo.expandedRect.maxY, 1117)
     }
 
@@ -78,8 +78,8 @@ final class NotchGeometryTests: XCTestCase {
         )
 
         let geo = NotchGeometry.compute(from: caps, screenFrame: frame)!
-        // Dynamic ear minimum: max(680, 214 + 440 = 654) = 680
-        XCTAssertGreaterThanOrEqual(geo.expandedRect.width, 680)
+        // Dynamic ear minimum: max(660, 214 + 380 = 594) = 660
+        XCTAssertGreaterThanOrEqual(geo.expandedRect.width, 660)
         XCTAssertEqual(geo.cameraExclusionRect?.width, 214)
         XCTAssertEqual(geo.cameraExclusionRect?.height, 32)
         XCTAssertEqual(geo.expandedRect.maxY, 956)
@@ -99,7 +99,7 @@ final class NotchGeometryTests: XCTestCase {
         )
 
         let geo = NotchGeometry.compute(from: caps, screenFrame: frame)!
-        XCTAssertGreaterThanOrEqual(geo.expandedRect.width, 680)
+        XCTAssertGreaterThanOrEqual(geo.expandedRect.width, 660)
         XCTAssertEqual(geo.cameraExclusionRect?.width, 206)
         XCTAssertEqual(geo.cameraExclusionRect?.height, 37)
         XCTAssertEqual(geo.expandedRect.maxY, 982)

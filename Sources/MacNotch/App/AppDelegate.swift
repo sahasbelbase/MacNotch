@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// Main application delegate coordinating lifecycle, managers, and system events.
@@ -23,6 +24,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var sleepObserver: NSObjectProtocol?
     private var wakeObserver: NSObjectProtocol?
+    private var cancellables = Set<AnyCancellable>()
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         // Run as accessory app (no dock icon, menu bar + floating panel)
@@ -33,7 +35,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         self.screenManager = ScreenManager()
         self.clipboardManager = ClipboardManager()
         self.timeService = TimeService()
-        self.weatherService = WeatherService()
+        self.weatherService = WeatherService.shared
         self.nowPlayingService = SystemNowPlayingService()
         self.batteryService = BatteryService()
         self.systemHUDService = SystemHUDService()
@@ -64,13 +66,21 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
-        // Wire Volume and Caps Lock Events to Notch Dynamic Island HUD
+        // Wire Volume, Keyboard Backlight, Display Brightness, and Caps Lock Events to Notch Dynamic Island HUD
         self.systemHUDService.onVolumeChange = { [weak self] volume, isMuted in
             self?.appState.showHUD(.volume(level: volume, isMuted: isMuted), duration: 2.0)
         }
 
         self.systemHUDService.onCapsLockChange = { [weak self] isCaps in
             self?.appState.showHUD(.capsLock(isOn: isCaps), duration: 2.0)
+        }
+
+        self.systemHUDService.onKeyboardBrightnessChange = { [weak self] level in
+            self?.appState.showHUD(.keyboardBrightness(level: level), duration: 2.0)
+        }
+
+        self.systemHUDService.onScreenBrightnessChange = { [weak self] level in
+            self?.appState.showHUD(.brightness(level: level), duration: 2.0)
         }
 
         // Wire Bluetooth Audio / AirPods Accessory Connection Events
@@ -88,6 +98,25 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 duration: 4.0
             )
         }
+
+        // Wire Now Playing playback start to subtle Music Hint in Notch
+        self.nowPlayingService.$isPlaying
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isPlaying in
+                guard let self = self else { return }
+                if isPlaying, let track = self.nowPlayingService.currentTrack, !track.title.isEmpty {
+                    self.appState.showHUD(
+                        .notification(
+                            title: track.title,
+                            subtitle: track.artist.isEmpty ? "Now Playing" : track.artist,
+                            icon: "music.note"
+                        ),
+                        duration: 3.0
+                    )
+                }
+            }
+            .store(in: &cancellables)
 
         // Sync settings with AppState
         let settings = SettingsStore.shared
@@ -116,7 +145,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // Initialize window and mouse tracking
-        self.windowManager = WindowManager(appState: appState, screenManager: screenManager)
+        self.windowManager = WindowManager(
+            appState: appState,
+            screenManager: screenManager,
+            nowPlayingService: nowPlayingService,
+            timerService: timerService
+        )
         self.mouseTracker = MouseTracker(appState: appState, screenManager: screenManager)
 
         // Configure shared Settings controller

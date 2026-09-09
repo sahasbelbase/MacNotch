@@ -14,19 +14,41 @@ public struct WeatherLocation: Identifiable, Codable, Equatable, Sendable {
     public let name: String
     public let latitude: Double
     public let longitude: Double
+    public let country: String?
+    public let admin1: String?
 
-    public init(id: String = UUID().uuidString, name: String, latitude: Double, longitude: Double) {
+    public init(
+        id: String = UUID().uuidString,
+        name: String,
+        latitude: Double,
+        longitude: Double,
+        country: String? = nil,
+        admin1: String? = nil
+    ) {
         self.id = id
         self.name = name
         self.latitude = latitude
         self.longitude = longitude
+        self.country = country
+        self.admin1 = admin1
     }
 
-    public static let kathmandu = WeatherLocation(id: "ktm", name: "Kathmandu", latitude: 27.7172, longitude: 85.3240)
-    public static let cupertino = WeatherLocation(id: "cup", name: "Cupertino", latitude: 37.3230, longitude: -122.0322)
-    public static let newYork = WeatherLocation(id: "nyc", name: "New York", latitude: 40.7128, longitude: -74.0060)
-    public static let london = WeatherLocation(id: "lon", name: "London", latitude: 51.5074, longitude: -0.1278)
-    public static let tokyo = WeatherLocation(id: "tyo", name: "Tokyo", latitude: 35.6762, longitude: 139.6503)
+    public var displayName: String {
+        var parts: [String] = [name]
+        if let admin1 = admin1, !admin1.isEmpty, admin1 != name {
+            parts.append(admin1)
+        }
+        if let country = country, !country.isEmpty {
+            parts.append(country)
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    public static let kathmandu = WeatherLocation(id: "ktm", name: "Kathmandu", latitude: 27.7172, longitude: 85.3240, country: "Nepal")
+    public static let cupertino = WeatherLocation(id: "cup", name: "Cupertino", latitude: 37.3230, longitude: -122.0322, country: "United States", admin1: "California")
+    public static let newYork = WeatherLocation(id: "nyc", name: "New York", latitude: 40.7128, longitude: -74.0060, country: "United States", admin1: "New York")
+    public static let london = WeatherLocation(id: "lon", name: "London", latitude: 51.5074, longitude: -0.1278, country: "United Kingdom")
+    public static let tokyo = WeatherLocation(id: "tyo", name: "Tokyo", latitude: 35.6762, longitude: 139.6503, country: "Japan")
 
     public static let presets: [WeatherLocation] = [.kathmandu, .cupertino, .newYork, .london, .tokyo]
 }

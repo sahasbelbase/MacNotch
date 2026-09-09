@@ -90,5 +90,36 @@ final class HardwareDynamicsTests: XCTestCase {
 
         XCTAssertEqual(caps1, caps2)
         XCTAssertNotEqual(caps1, caps3)
+
+        let kbHUD1 = TransientHUD.keyboardBrightness(level: 0.75)
+        let kbHUD2 = TransientHUD.keyboardBrightness(level: 0.75)
+        let kbHUD3 = TransientHUD.keyboardBrightness(level: 0.25)
+
+        XCTAssertEqual(kbHUD1, kbHUD2)
+        XCTAssertNotEqual(kbHUD1, kbHUD3)
+    }
+
+    func testKeyboardAndScreenBrightnessControls() {
+        let hudService = SystemHUDService()
+        var receivedKbLevel: Float?
+        var receivedScrLevel: Float?
+
+        hudService.onKeyboardBrightnessChange = { level in
+            receivedKbLevel = level
+        }
+        hudService.onScreenBrightnessChange = { level in
+            receivedScrLevel = level
+        }
+
+        hudService.setKeyboardBrightness(0.8)
+        XCTAssertEqual(hudService.keyboardBrightness, 0.8, accuracy: 0.001)
+        XCTAssertEqual(receivedKbLevel, 0.8)
+
+        hudService.adjustKeyboardBrightness(delta: -0.2)
+        XCTAssertEqual(hudService.keyboardBrightness, 0.6, accuracy: 0.001)
+
+        hudService.setScreenBrightness(0.95)
+        XCTAssertEqual(hudService.screenBrightness, 0.95, accuracy: 0.001)
+        XCTAssertEqual(receivedScrLevel, 0.95)
     }
 }
