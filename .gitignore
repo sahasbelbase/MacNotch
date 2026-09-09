@@ -12,4 +12,5 @@ xcuserdata/
 *.moved-aside
 *.pbxuser
 *.perspectivev3
-*.dmg
+!MacNotch.dmg
+!releases/*.dmg

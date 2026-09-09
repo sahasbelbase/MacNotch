@@ -28,5 +28,7 @@ hdiutil create -volname "MacNotch" \
                build/MacNotch.dmg
 
 cp build/MacNotch.dmg ./MacNotch.dmg
-echo "==> Done! Output: ./MacNotch.dmg"
-ls -lh MacNotch.dmg
+mkdir -p releases
+cp build/MacNotch.dmg releases/MacNotch.dmg
+echo "==> Done! Outputs:"
+ls -lh MacNotch.dmg releases/MacNotch.dmg

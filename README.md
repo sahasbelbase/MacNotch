@@ -14,10 +14,11 @@ MacNotch turns the MacBook camera housing into an interactive, fluid utility are
 
 ## 📦 Download & Installation
 
-The drag-and-drop installer disk image is available at:
-`./MacNotch.dmg`
+The ready-to-run drag-and-drop installer disk image is available directly in the repository:
+- **Root**: [`./MacNotch.dmg`](file:///Users/sahas/Documents/Projects/MacNotch/MacNotch.dmg)
+- **Releases**: [`./releases/MacNotch.dmg`](file:///Users/sahas/Documents/Projects/MacNotch/releases/MacNotch.dmg)
 
-1. Double-click `MacNotch.dmg` to mount the disk image.
+1. Download or double-click `MacNotch.dmg` to mount the disk image.
 2. Drag `MacNotch.app` into your **Applications** folder.
 3. Launch `MacNotch` from Applications or Spotlight.
 4. The utility will automatically integrate with your camera notch and appear in your menu bar.
