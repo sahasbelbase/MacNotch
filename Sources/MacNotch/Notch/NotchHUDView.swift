@@ -113,6 +113,20 @@ public struct NotchHUDView: View {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(Color.cyan)
+
+        case .music:
+            HStack(spacing: 5) {
+                Image(systemName: "music.note")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(DesignSystem.Colors.emerald)
+
+                WaveformVisualizerView(
+                    isPlaying: true,
+                    color: DesignSystem.Colors.emerald,
+                    barCount: 4,
+                    maxHeight: 10
+                )
+            }
         }
     }
 
@@ -230,6 +244,22 @@ public struct NotchHUDView: View {
                         .lineLimit(1)
                 }
             }
+
+        case .music(let title, let artist):
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if let art = artist, !art.isEmpty {
+                    Text(art)
+                        .font(.system(size: 9))
+                        .foregroundColor(DesignSystem.Colors.emerald.opacity(0.85))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            }
         }
     }
 
@@ -251,6 +281,8 @@ public struct NotchHUDView: View {
             return DesignSystem.Colors.emerald.opacity(0.6)
         case .notification:
             return Color.cyan.opacity(0.6)
+        case .music:
+            return DesignSystem.Colors.emerald.opacity(0.6)
         }
     }
 
@@ -270,6 +302,8 @@ public struct NotchHUDView: View {
             return DesignSystem.Colors.emerald.opacity(0.35)
         case .notification:
             return Color.cyan.opacity(0.35)
+        case .music:
+            return DesignSystem.Colors.emerald.opacity(0.35)
         }
     }
 }

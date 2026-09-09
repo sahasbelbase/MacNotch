@@ -45,14 +45,6 @@ public final class WindowManager: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // React to music playback state
-        nowPlayingService?.$isPlaying
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.updateWindowPositionAndVisibility()
-            }
-            .store(in: &cancellables)
-
         // React to focus timer state
         timerService?.$isRunning
             .receive(on: RunLoop.main)
@@ -92,9 +84,8 @@ public final class WindowManager: ObservableObject {
         case .expanded:
             targetFrame = geometry.expandedRect
         case .collapsed, .activating, .collapsing:
-            let hasMusicHint = (nowPlayingService?.isPlaying == true)
             let hasActiveTimer = (timerService?.isRunning == true)
-            if appState.activeHUD != nil || hasMusicHint || hasActiveTimer {
+            if appState.activeHUD != nil || hasActiveTimer {
                 targetFrame = geometry.hudRect
             } else {
                 targetFrame = geometry.collapsedRect

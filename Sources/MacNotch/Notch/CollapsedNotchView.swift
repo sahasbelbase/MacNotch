@@ -78,49 +78,6 @@ public struct CollapsedNotchView: View {
                         .shadow(color: Color.orange.opacity(0.25), radius: 8, x: 0, y: 1)
                 )
                 .transition(.scale(scale: 0.95, anchor: .top).combined(with: .opacity))
-            } else if let nowPlaying = nowPlayingService, nowPlaying.isPlaying {
-                let camWidth = screenManager.currentNotchGeometry?.cameraExclusionRect?.width ?? 200
-                let camHeight = screenManager.currentNotchGeometry?.cameraExclusionRect?.height ?? 34
-                HStack(spacing: 0) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(DesignSystem.Colors.emerald)
-
-                        WaveformVisualizerView(
-                            isPlaying: true,
-                            color: DesignSystem.Colors.emerald,
-                            barCount: 4,
-                            maxHeight: 10
-                        )
-                    }
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.trailing, 10)
-
-                    Color.clear
-                        .frame(width: max(camWidth, 160), height: camHeight)
-
-                    HStack(spacing: 4) {
-                        Text(nowPlaying.currentTrack?.title ?? "Playing")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 10)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(Color.black.opacity(0.88))
-                        .overlay(
-                            Capsule().stroke(DesignSystem.Colors.emerald.opacity(0.4), lineWidth: 1)
-                        )
-                        .shadow(color: DesignSystem.Colors.emerald.opacity(0.25), radius: 8, x: 0, y: 1)
-                )
-                .transition(.scale(scale: 0.95, anchor: .top).combined(with: .opacity))
             } else if appState.currentState == .activating {
                 Capsule()
                     .fill(Color.accentColor.opacity(0.95))

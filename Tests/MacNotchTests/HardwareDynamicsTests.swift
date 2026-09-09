@@ -97,6 +97,13 @@ final class HardwareDynamicsTests: XCTestCase {
 
         XCTAssertEqual(kbHUD1, kbHUD2)
         XCTAssertNotEqual(kbHUD1, kbHUD3)
+
+        let music1 = TransientHUD.music(title: "Track 1", artist: "Artist A")
+        let music2 = TransientHUD.music(title: "Track 1", artist: "Artist A")
+        let music3 = TransientHUD.music(title: "Track 2", artist: "Artist B")
+
+        XCTAssertEqual(music1, music2)
+        XCTAssertNotEqual(music1, music3)
     }
 
     func testKeyboardAndScreenBrightnessControls() {

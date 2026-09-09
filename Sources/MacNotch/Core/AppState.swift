@@ -51,6 +51,7 @@ public enum TransientHUD: Equatable, Sendable {
     case capsLock(isOn: Bool)
     case accessory(name: String, icon: String, batteryPercentage: Int?)
     case notification(title: String, subtitle: String?, icon: String)
+    case music(title: String, artist: String?)
 }
 
 /// Central state machine and controller for the MacNotch application.

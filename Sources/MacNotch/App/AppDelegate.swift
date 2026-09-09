@@ -99,21 +99,51 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
-        // Wire Now Playing playback start to subtle Music Hint in Notch
+        // Wire Now Playing playback start and track change to a 2-second glimpse in Notch
+        var lastNotifiedTrackTitle: String = ""
+        var lastNotifiedTrackArtist: String = ""
+
+        let triggerMusicGlimpse: (Track) -> Void = { [weak self] track in
+            guard let self = self else { return }
+            guard self.nowPlayingService.isPlaying, !track.title.isEmpty else { return }
+            lastNotifiedTrackTitle = track.title
+            lastNotifiedTrackArtist = track.artist
+            self.appState.showHUD(
+                .music(
+                    title: track.title,
+                    artist: track.artist.isEmpty ? (self.nowPlayingService.activePlayerName ?? "Now Playing") : track.artist
+                ),
+                duration: 2.0
+            )
+        }
+
         self.nowPlayingService.$isPlaying
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] isPlaying in
                 guard let self = self else { return }
-                if isPlaying, let track = self.nowPlayingService.currentTrack, !track.title.isEmpty {
-                    self.appState.showHUD(
-                        .notification(
-                            title: track.title,
-                            subtitle: track.artist.isEmpty ? "Now Playing" : track.artist,
-                            icon: "music.note"
-                        ),
-                        duration: 3.0
-                    )
+                if isPlaying {
+                    if let track = self.nowPlayingService.currentTrack, !track.title.isEmpty {
+                        triggerMusicGlimpse(track)
+                    }
+                } else {
+                    if case .music = self.appState.activeHUD {
+                        self.appState.dismissHUD()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        self.nowPlayingService.$currentTrack
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] track in
+                guard let self = self,
+                      self.nowPlayingService.isPlaying,
+                      let track = track,
+                      !track.title.isEmpty else { return }
+                if track.title != lastNotifiedTrackTitle || track.artist != lastNotifiedTrackArtist {
+                    triggerMusicGlimpse(track)
                 }
             }
             .store(in: &cancellables)
