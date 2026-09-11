@@ -258,39 +258,47 @@ public struct PowerToolsView: View {
         let filename = "Screen Shot \(formatter.string(from: Date())).png"
         let fileURL = desktop.appendingPathComponent(filename)
 
-        DispatchQueue.global(qos: .userInitiated).async {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-            var args = ["-c"] // Copy to clipboard
-            switch mode {
-            case .selection:
-                args.append("-i")
-            case .window:
-                args.append("-w")
-            case .fullScreen:
-                break
-            }
-            args.append(fileURL.path)
-            process.arguments = args
+        // 1. Immediately collapse the notch so it is never included in the screenshot
+        appState.collapse()
 
-            do {
-                try process.run()
-                process.waitUntilExit()
-
-                DispatchQueue.main.async {
-                    if FileManager.default.fileExists(atPath: fileURL.path) {
-                        self.appState.showHUD(
-                            .notification(
-                                title: "Screenshot Captured",
-                                subtitle: "Saved to Desktop & Clipboard",
-                                icon: "camera.fill"
-                            ),
-                            duration: 3.0
-                        )
-                    }
+        // 2. Wait 0.35s for the collapse animation so the notch window is completely gone from the screen
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                var args = ["-c"] // Copy to clipboard
+                switch mode {
+                case .selection:
+                    args.append("-i")
+                    args.append("-s") // Area / partial selection mode
+                case .window:
+                    args.append("-i")
+                    args.append("-w") // Window selection mode
+                case .fullScreen:
+                    break // Entire screen mode
                 }
-            } catch {
-                print("Failed to run screencapture: \(error)")
+                args.append(fileURL.path)
+                process.arguments = args
+
+                do {
+                    try process.run()
+                    process.waitUntilExit()
+
+                    DispatchQueue.main.async {
+                        if FileManager.default.fileExists(atPath: fileURL.path) {
+                            self.appState.showHUD(
+                                .notification(
+                                    title: "Screenshot Captured",
+                                    subtitle: "Saved to Desktop & Clipboard",
+                                    icon: "camera.fill"
+                                ),
+                                duration: 3.0
+                            )
+                        }
+                    }
+                } catch {
+                    print("Failed to run screencapture: \(error)")
+                }
             }
         }
     }
@@ -446,14 +454,18 @@ public struct PowerToolsView: View {
         }
 
         isProcessing = true
-        ScreenOCRService.shared.captureAndRecognize { recognized in
-            isProcessing = false
-            if let text = recognized, !text.isEmpty {
-                let preview = text.prefix(28) + (text.count > 28 ? "..." : "")
-                appState.showHUD(
-                    .notification(title: "Text Copied!", subtitle: String(preview), icon: "text.viewfinder"),
-                    duration: 3.0
-                )
+        appState.collapse()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            ScreenOCRService.shared.captureAndRecognize { recognized in
+                isProcessing = false
+                if let text = recognized, !text.isEmpty {
+                    let preview = text.prefix(28) + (text.count > 28 ? "..." : "")
+                    appState.showHUD(
+                        .notification(title: "Text Copied!", subtitle: String(preview), icon: "text.viewfinder"),
+                        duration: 3.0
+                    )
+                }
             }
         }
     }

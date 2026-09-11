@@ -159,6 +159,12 @@ public final class AppState: ObservableObject {
         }
     }
 
+    /// Collapses the expanded notch back to its idle/collapsed state immediately.
+    public func collapse() {
+        cancelAllTasks()
+        currentState = .collapsed
+    }
+
     // MARK: - Timer Scheduling
 
     public func handleMouseEnter() {

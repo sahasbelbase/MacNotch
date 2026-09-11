@@ -319,7 +319,7 @@ public struct ExpandedNotchView: View {
 
     private var powerToolsOverlayView: some View {
         ZStack {
-            Color.black.opacity(0.7)
+            Color.black.opacity(0.85)
                 .onTapGesture {
                     withAnimation(DesignSystem.Animation.tabSwitch) {
                         showPowerTools = false
@@ -350,8 +350,10 @@ public struct ExpandedNotchView: View {
                 PowerToolsView(appState: appState, clipboardManager: clipboardManager)
             }
             .padding(12)
-            .background(.ultraThinMaterial)
-            .cornerRadius(12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(nsColor: .windowBackgroundColor).opacity(0.98))
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(DesignSystem.Colors.subtleBorder, lineWidth: 1)
