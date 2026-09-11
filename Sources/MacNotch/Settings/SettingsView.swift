@@ -100,13 +100,6 @@ public struct SettingsView: View {
                     Slider(value: $settings.collapseDelay, in: 0.20...0.80, step: 0.05)
                 }
             }
-
-            Section("Hardware HUD Indicators") {
-                Toggle("Show Volume & Brightness HUD in Notch", isOn: $settings.showNotchHardwareHUD)
-                Text("Displays sleek animated indicators from the notch wings when adjusting volume, screen brightness, or keyboard backlight.")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            }
         }
         .formStyle(.grouped)
     }

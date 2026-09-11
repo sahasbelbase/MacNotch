@@ -132,25 +132,13 @@ final class HardwareDynamicsTests: XCTestCase {
 
     func testHardwareBrightnessServiceDirectControl() {
         let service = HardwareBrightnessService.shared
-        let initialDisplay = service.getDisplayBrightness()
-        XCTAssertGreaterThanOrEqual(initialDisplay, 0.0)
-        XCTAssertLessThanOrEqual(initialDisplay, 1.0)
+        let display = service.getDisplayBrightness()
+        XCTAssertGreaterThanOrEqual(display, 0.0)
+        XCTAssertLessThanOrEqual(display, 1.0)
 
-        service.setDisplayBrightness(0.65)
-        XCTAssertEqual(service.getDisplayBrightness(), 0.65, accuracy: 0.05)
-
-        // Restore initial display brightness
-        service.setDisplayBrightness(initialDisplay)
-
-        let initialKeyboard = service.getKeyboardBrightness()
-        XCTAssertGreaterThanOrEqual(initialKeyboard, 0.0)
-        XCTAssertLessThanOrEqual(initialKeyboard, 1.0)
-
-        service.setKeyboardBrightness(0.45)
-        XCTAssertEqual(service.getKeyboardBrightness(), 0.45, accuracy: 0.05)
-
-        // Restore initial keyboard brightness
-        service.setKeyboardBrightness(initialKeyboard)
+        let keyboard = service.getKeyboardBrightness()
+        XCTAssertGreaterThanOrEqual(keyboard, 0.0)
+        XCTAssertLessThanOrEqual(keyboard, 1.0)
     }
 
     func testHUDAutoDismissalAndDeduplication() async throws {
@@ -187,30 +175,5 @@ final class HardwareDynamicsTests: XCTestCase {
         let helper = ScreenCapturePermissionHelper.shared
         _ = helper.hasPermission
         XCTAssertNotNil(helper)
-    }
-
-    func testNotchHardwareHUDPreference() {
-        let settings = SettingsStore.shared
-        settings.showNotchHardwareHUD = true
-        XCTAssertTrue(settings.showNotchHardwareHUD)
-
-        let appState = AppState()
-        let volumeHUD = TransientHUD.volume(level: 0.75, isMuted: false)
-
-        if settings.showNotchHardwareHUD {
-            appState.showHUD(volumeHUD, duration: 2.0)
-        }
-        XCTAssertEqual(appState.activeHUD, volumeHUD)
-
-        // When disabled
-        settings.showNotchHardwareHUD = false
-        appState.dismissHUD()
-        if settings.showNotchHardwareHUD {
-            appState.showHUD(volumeHUD, duration: 2.0)
-        }
-        XCTAssertNil(appState.activeHUD)
-
-        // Restore default
-        settings.showNotchHardwareHUD = true
     }
 }

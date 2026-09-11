@@ -66,24 +66,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
-        // Wire Volume, Keyboard Backlight, Display Brightness, and Caps Lock Events to Notch Dynamic Island HUD
-        self.systemHUDService.onVolumeChange = { [weak self] volume, isMuted in
-            guard SettingsStore.shared.showNotchHardwareHUD else { return }
-            self?.appState.showHUD(.volume(level: volume, isMuted: isMuted), duration: 2.0)
-        }
-
+        // Wire Caps Lock Events to Notch Dynamic Island HUD
         self.systemHUDService.onCapsLockChange = { [weak self] isCaps in
             self?.appState.showHUD(.capsLock(isOn: isCaps), duration: 2.0)
-        }
-
-        self.systemHUDService.onKeyboardBrightnessChange = { [weak self] level in
-            guard SettingsStore.shared.showNotchHardwareHUD else { return }
-            self?.appState.showHUD(.keyboardBrightness(level: level), duration: 2.0)
-        }
-
-        self.systemHUDService.onScreenBrightnessChange = { [weak self] level in
-            guard SettingsStore.shared.showNotchHardwareHUD else { return }
-            self?.appState.showHUD(.brightness(level: level), duration: 2.0)
         }
 
         // Wire Bluetooth Audio / AirPods Accessory Connection Events

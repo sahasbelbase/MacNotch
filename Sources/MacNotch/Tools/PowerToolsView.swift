@@ -298,63 +298,29 @@ public struct PowerToolsView: View {
     // MARK: - Hardware Quick Controls Card
 
     private var hardwareControlsCard: some View {
-        HStack(spacing: 14) {
-            // Keyboard Backlight
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Image(systemName: "keyboard.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.cyan)
-                    Text("Keyboard Backlight")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(DesignSystem.Colors.textPrimary)
-                    Spacer()
-                    Text("\(Int(keyboardBrightness * 100))%")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundColor(.cyan)
-                }
-
-                Slider(value: $keyboardBrightness, in: 0...1)
-                    .accentColor(.cyan)
-                    .onChange(of: keyboardBrightness) { newVal in
-                        HardwareBrightnessService.shared.setKeyboardBrightness(newVal)
-                        if SettingsStore.shared.showNotchHardwareHUD {
-                            appState.showHUD(.keyboardBrightness(level: newVal), duration: 2.0)
-                        }
-                    }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Image(systemName: "keyboard.fill")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.cyan)
+                Text("Keyboard Backlight")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(DesignSystem.Colors.textPrimary)
+                Spacer()
+                Text("\(Int(keyboardBrightness * 100))%")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(.cyan)
             }
-            .padding(8)
-            .background(Color.white.opacity(0.04))
-            .cornerRadius(8)
 
-            // Screen Brightness
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Image(systemName: "sun.max.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.yellow)
-                    Text("Display Brightness")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(DesignSystem.Colors.textPrimary)
-                    Spacer()
-                    Text("\(Int(screenBrightness * 100))%")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundColor(.yellow)
+            Slider(value: $keyboardBrightness, in: 0...1)
+                .accentColor(.cyan)
+                .onChange(of: keyboardBrightness) { newVal in
+                    HardwareBrightnessService.shared.setKeyboardBrightness(newVal)
                 }
-
-                Slider(value: $screenBrightness, in: 0...1)
-                    .accentColor(.yellow)
-                    .onChange(of: screenBrightness) { newVal in
-                        HardwareBrightnessService.shared.setDisplayBrightness(newVal)
-                        if SettingsStore.shared.showNotchHardwareHUD {
-                            appState.showHUD(.brightness(level: newVal), duration: 2.0)
-                        }
-                    }
-            }
-            .padding(8)
-            .background(Color.white.opacity(0.04))
-            .cornerRadius(8)
         }
+        .padding(8)
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(8)
     }
 
     // MARK: - Color Sampler Card
