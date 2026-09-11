@@ -20,17 +20,14 @@ public final class SystemHUDService: ObservableObject {
 
     private var globalFlagsMonitor: Any?
     private var localFlagsMonitor: Any?
-    private var systemEventsMonitor: Any?
     private var defaultOutputDeviceID: AudioDeviceID = 0
-    private var hasListener: Bool = false
 
     public init() {
         self.isCapsLockOn = NSEvent.modifierFlags.contains(.capsLock)
         self.screenBrightness = HardwareBrightnessService.shared.getDisplayBrightness()
         self.keyboardBrightness = HardwareBrightnessService.shared.getKeyboardBrightness()
         setupCapsLockMonitoring()
-        setupVolumeMonitoring()
-        setupMediaKeyMonitoring()
+        queryInitialAudioState()
     }
 
     deinit {
@@ -39,9 +36,6 @@ public final class SystemHUDService: ObservableObject {
         }
         if let local = localFlagsMonitor {
             NSEvent.removeMonitor(local)
-        }
-        if let sys = systemEventsMonitor {
-            NSEvent.removeMonitor(sys)
         }
     }
 
@@ -70,15 +64,9 @@ public final class SystemHUDService: ObservableObject {
         }
     }
 
-    // MARK: - CoreAudio Volume Monitoring
+    // MARK: - Initial Audio State Query (Listeners removed to avoid intercepting volume keys)
 
-    private func setupVolumeMonitoring() {
-        updateDefaultOutputDevice()
-    }
-
-    private func updateDefaultOutputDevice() {
-        removeVolumeListener()
-
+    private func queryInitialAudioState() {
         var defaultDeviceID = AudioDeviceID(0)
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
@@ -98,37 +86,7 @@ public final class SystemHUDService: ObservableObject {
 
         guard status == noErr, defaultDeviceID != 0 else { return }
         self.defaultOutputDeviceID = defaultDeviceID
-
-        // Query current volume
         queryVolume(for: defaultDeviceID)
-
-        // Attach listener for volume changes
-        var volumeAddress = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
-            mScope: kAudioObjectPropertyScopeOutput,
-            mElement: kAudioObjectPropertyElementMain
-        )
-
-        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
-            Task { @MainActor in
-                self?.handleVolumeChanged()
-            }
-        }
-
-        let listenerStatus = AudioObjectAddPropertyListenerBlock(
-            defaultDeviceID,
-            &volumeAddress,
-            DispatchQueue.main,
-            listener
-        )
-
-        if listenerStatus == noErr {
-            hasListener = true
-        }
-    }
-
-    private func removeVolumeListener() {
-        hasListener = false
     }
 
     private func queryVolume(for deviceID: AudioDeviceID) {
@@ -167,47 +125,7 @@ public final class SystemHUDService: ObservableObject {
         }
     }
 
-    private func handleVolumeChanged() {
-        guard defaultOutputDeviceID != 0 else { return }
-        let oldVolume = self.currentVolume
-        let oldMuted = self.isMuted
-
-        queryVolume(for: defaultOutputDeviceID)
-
-        if abs(self.currentVolume - oldVolume) > 0.005 || self.isMuted != oldMuted {
-            onVolumeChange?(self.currentVolume, self.isMuted)
-        }
-    }
-
-    // MARK: - Display & Keyboard Backlight Monitoring
-
-    private func setupMediaKeyMonitoring() {
-        systemEventsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .systemDefined) { [weak self] event in
-            guard event.subtype.rawValue == 8 else { return }
-            let data = event.data1
-            let keyCode = Int((data & 0xFFFF0000) >> 16)
-            let keyFlags = (data & 0x0000FFFF)
-            let keyState = (((keyFlags & 0xFF00) >> 8)) == 0xA // Key down
-            guard keyState else { return }
-
-            MainActor.assumeIsolated {
-                switch keyCode {
-                case 21: // NX_KEYTYPE_ILLUMINATION_UP
-                    self?.adjustKeyboardBrightness(delta: 0.0625)
-                case 22: // NX_KEYTYPE_ILLUMINATION_DOWN
-                    self?.adjustKeyboardBrightness(delta: -0.0625)
-                case 23: // NX_KEYTYPE_ILLUMINATION_TOGGLE
-                    self?.toggleKeyboardBrightness()
-                case 2:  // NX_KEYTYPE_BRIGHTNESS_UP
-                    self?.adjustScreenBrightness(delta: 0.0625)
-                case 3:  // NX_KEYTYPE_BRIGHTNESS_DOWN
-                    self?.adjustScreenBrightness(delta: -0.0625)
-                default:
-                    break
-                }
-            }
-        }
-    }
+    // MARK: - Programmatic Hardware Brightness Controls (Used by Notch in-app controls)
 
     public func setKeyboardBrightness(_ level: Float) {
         let clamped = max(0.0, min(1.0, level))

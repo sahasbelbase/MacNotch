@@ -318,7 +318,6 @@ public struct PowerToolsView: View {
                     .accentColor(.cyan)
                     .onChange(of: keyboardBrightness) { newVal in
                         HardwareBrightnessService.shared.setKeyboardBrightness(newVal)
-                        appState.showHUD(.keyboardBrightness(level: newVal), duration: 2.0)
                     }
             }
             .padding(8)
@@ -344,7 +343,6 @@ public struct PowerToolsView: View {
                     .accentColor(.yellow)
                     .onChange(of: screenBrightness) { newVal in
                         HardwareBrightnessService.shared.setDisplayBrightness(newVal)
-                        appState.showHUD(.brightness(level: newVal), duration: 2.0)
                     }
             }
             .padding(8)
