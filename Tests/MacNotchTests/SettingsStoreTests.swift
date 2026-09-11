@@ -8,6 +8,7 @@ final class SettingsStoreTests: XCTestCase {
         settings.resetToDefaults()
 
         XCTAssertTrue(settings.enableNotch)
+        XCTAssertTrue(settings.showNotchHardwareHUD)
         XCTAssertEqual(settings.hoverDelay, 0.12, accuracy: 0.01)
         XCTAssertEqual(settings.collapseDelay, 0.35, accuracy: 0.01)
         XCTAssertEqual(settings.clipboardRetention, 80)

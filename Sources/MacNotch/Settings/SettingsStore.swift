@@ -8,6 +8,7 @@ public final class SettingsStore: ObservableObject {
 
     // MARK: - General Settings
     @AppStorage("enableNotch") public var enableNotch: Bool = true
+    @AppStorage("showNotchHardwareHUD") public var showNotchHardwareHUD: Bool = true
     @AppStorage("hoverDelay") public var hoverDelay: Double = 0.12
     @AppStorage("collapseDelay") public var collapseDelay: Double = 0.35
     @AppStorage("launchAtLogin") public var launchAtLogin: Bool = false {
@@ -114,6 +115,7 @@ public final class SettingsStore: ObservableObject {
     /// Resets all settings to default values.
     public func resetToDefaults() {
         enableNotch = true
+        showNotchHardwareHUD = true
         hoverDelay = 0.12
         collapseDelay = 0.35
         setLaunchAtLogin(false)

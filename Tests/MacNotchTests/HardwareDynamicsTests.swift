@@ -188,4 +188,29 @@ final class HardwareDynamicsTests: XCTestCase {
         _ = helper.hasPermission
         XCTAssertNotNil(helper)
     }
+
+    func testNotchHardwareHUDPreference() {
+        let settings = SettingsStore.shared
+        settings.showNotchHardwareHUD = true
+        XCTAssertTrue(settings.showNotchHardwareHUD)
+
+        let appState = AppState()
+        let volumeHUD = TransientHUD.volume(level: 0.75, isMuted: false)
+
+        if settings.showNotchHardwareHUD {
+            appState.showHUD(volumeHUD, duration: 2.0)
+        }
+        XCTAssertEqual(appState.activeHUD, volumeHUD)
+
+        // When disabled
+        settings.showNotchHardwareHUD = false
+        appState.dismissHUD()
+        if settings.showNotchHardwareHUD {
+            appState.showHUD(volumeHUD, duration: 2.0)
+        }
+        XCTAssertNil(appState.activeHUD)
+
+        // Restore default
+        settings.showNotchHardwareHUD = true
+    }
 }
